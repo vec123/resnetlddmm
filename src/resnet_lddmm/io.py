@@ -9,6 +9,40 @@ from src.vtk.io import load_vtp
 from src.vtk.extract import extract_vtp_points_cells, extract_vtp_point_fields
 
 
+@dataclass(frozen=True)
+class FrameTransform:
+    """Affine normalization transform: center and scale (STEPS T14).
+
+    Applies the transformation: (x - center) / scale
+    Inverts via: x * scale + center
+    """
+
+    center: torch.Tensor  # [3]
+    scale: torch.Tensor  # scalar or [1]
+
+    def apply(self, points):
+        """Apply the transform: (points - center) / scale.
+
+        Args:
+            points: [B, N, 3] or [N, 3]
+
+        Returns:
+            Transformed points in the same shape
+        """
+        return (points - self.center) / self.scale
+
+    def invert(self, points):
+        """Invert the transform: points * scale + center.
+
+        Args:
+            points: [B, N, 3] or [N, 3]
+
+        Returns:
+            Inverted points in the same shape
+        """
+        return points * self.scale + self.center
+
+
 @dataclass
 class Shape:
     """A shape with points, faces, and optional weights and normals.
@@ -59,3 +93,61 @@ def load_shape(path):
         normals = torch.tensor(fields["normal"], dtype=torch.float32).unsqueeze(0)
 
     return Shape(points=points, faces=faces, weights=weights, normals=normals)
+
+
+def joint_normalize(shapes, domain=(0, 1)):
+    """Normalize a list of shapes to fit jointly into a domain (STEPS T14).
+
+    Computes one bounding box over all shapes' union, then fits it to the
+    target domain with a single center and scale applied to all.
+
+    Args:
+        shapes: list of Shape objects
+        domain: (min, max) tuple for target domain (default (0, 1))
+
+    Returns:
+        (normalized_shapes, transform) where normalized_shapes is a list of
+        Shape objects with normalized points, and transform is the FrameTransform
+        used (for exporting back to world coordinates)
+    """
+    if not shapes:
+        raise ValueError("shapes list cannot be empty")
+
+    # Collect all points: [B, N, 3] -> flatten to [total_points, 3]
+    all_points = torch.cat([s.points.reshape(-1, 3) for s in shapes], dim=0)
+
+    # Compute bbox
+    min_pt = all_points.min(dim=0).values  # [3]
+    max_pt = all_points.max(dim=0).values  # [3]
+
+    # Bbox size
+    bbox_size = max_pt - min_pt  # [3]
+    # Use the max dimension for uniform scaling (fits tightest box into cube)
+    scale = bbox_size.max()
+
+    # Center of bbox
+    center = (min_pt + max_pt) / 2
+
+    # Fit to domain: normalize to [-0.5, 0.5], then scale to domain
+    domain_min, domain_max = domain
+    domain_scale = domain_max - domain_min
+    domain_center = (domain_max + domain_min) / 2
+
+    # Transform: first center at origin, scale by 1/scale, then fit to domain
+    transform = FrameTransform(center=center, scale=scale)
+
+    # Normalize all shapes
+    normalized_shapes = []
+    for shape in shapes:
+        norm_points = transform.apply(shape.points)
+        # Shift from [-0.5, 0.5] to domain
+        norm_points = norm_points * domain_scale + domain_center
+
+        normalized_shapes.append(Shape(
+            points=norm_points,
+            faces=shape.faces,
+            weights=shape.weights,
+            normals=shape.normals
+        ))
+
+    return normalized_shapes, transform
