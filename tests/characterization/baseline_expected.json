@@ -1,0 +1,13 @@
+{
+  "num_nodes": 1892,
+  "num_edges": 32036,
+  "mu_shape": [6, 5],
+  "logvar_shape": [6, 5],
+  "pred_shape": [6, 16, 3],
+  "num_trainable_params": 57071,
+  "steps": [
+    {"loss": 0.743558, "recon": 0.581930, "kl": 1.616278, "contrastive": 0.0},
+    {"loss": 0.556992, "recon": 0.399209, "kl": 1.577831, "contrastive": 0.0},
+    {"loss": 0.450099, "recon": 0.296067, "kl": 1.540324, "contrastive": 0.0}
+  ]
+}

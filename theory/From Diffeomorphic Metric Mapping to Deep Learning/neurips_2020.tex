@@ -1,0 +1,69 @@
+\documentclass[nonatbib]{article}
+\usepackage{lipsum, lineno}
+\usepackage{graphicx}
+\usepackage[preprint]{neurips_2020}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{amsmath}
+\usepackage[noabbrev]{cleveref}
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{lipsum, lineno}
+\usepackage{setspace}
+\usepackage{cite}
+\usepackage[mathscr]{euscript}
+\usepackage{placeins}
+\usepackage{bm}
+\usepackage{multirow}
+\usepackage[table,xcdraw]{xcolor}
+% Sorts and compresses numeric citations 
+%\biboptions{sort&compress}
+\usepackage[symbol]{footmisc}
+
+
+\title{Shape modeling of longitudinal medical images: from diffeomorphic metric mapping to deep learning}
+
+\author{
+  Edwin Tay \\
+  Delft University of Technology\\
+  \texttt{e.w.s.tay@tudelft.nl} \\
+  \AND
+  Nazli Tümer\thanks{Both authors contributed equally to this study} \\
+  Delft University of Technology\\
+  \texttt{N.Tumer-1@tudelft.nl} \\
+  \And
+  Amir A. Zadpoor\footnotemark[1] \\
+  Delft University of Technology\\
+  \texttt{A.A.Zadpoor@tudelft.nl} \\
+}
+
+% \doublespacing
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+
+    Living biological tissue is a complex system, constantly growing and changing in response to external and internal stimuli. These processes lead to remarkable and intricate changes in shape. Modeling and understanding both natural and pathological (or abnormal) changes in the shape of anatomical structures is highly relevant, with applications in diagnostic, prognostic, and therapeutic healthcare. Nevertheless, modeling the longitudinal shape change of biological tissue is a non-trivial task due to its inherent nonlinear nature. In this review, we highlight several existing methodologies and tools for modeling longitudinal shape change (\textit{i.e.,} spatiotemporal shape modeling). These methods range from diffeomorphic metric mapping to deep-learning based approaches (\textit{e.g.,} autoencoders, generative networks, recurrent neural networks, \textit{etc.}). We discuss the synergistic combinations of existing technologies and potential directions for future research, underscoring key deficiencies in the current research landscape.
+ 
+\end{abstract}
+
+%\linenumbers
+
+\input{introduction.tex}
+\input{diffeomorphisms.tex}
+\input{deeplearning.tex}
+\input{discussion.tex}
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{references.bib}
+
+\end{document}
