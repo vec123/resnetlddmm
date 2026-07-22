@@ -14,3 +14,7 @@ Registry.register("conditioning", "none", "src.resnet_lddmm.conditioning.base:No
 
 # STEPS T6: VelocityField + TimeVaryingField
 Registry.register("field", "time_varying", "src.resnet_lddmm.fields.time_varying:TimeVaryingField")
+
+# STEPS T9: DataTerm + CDData + L2Data
+Registry.register("data_term", "chamfer", "src.resnet_lddmm.losses.data_terms:CDData")
+Registry.register("data_term", "l2", "src.resnet_lddmm.losses.data_terms:L2Data")
