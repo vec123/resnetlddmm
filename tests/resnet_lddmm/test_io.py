@@ -2,8 +2,14 @@
 
 import torch
 import pytest
+import os
+import tempfile
+import numpy as np
 
-from src.resnet_lddmm.io import Shape, load_shape, FrameTransform, joint_normalize
+from src.resnet_lddmm.io import Shape, load_shape, FrameTransform, joint_normalize, export_trajectory
+from src.resnet_lddmm.trajectory import Trajectory
+from src.vtk.io import load_vtp
+from src.vtk.extract import extract_vtp_points_cells, extract_vtp_point_fields
 
 
 class TestShapeDataclass:
@@ -273,3 +279,199 @@ class TestJointNormalize:
         # All points should be in [-1, 1]
         assert (normalized[0].points >= -1.0 - 1e-5).all()
         assert (normalized[0].points <= 1.0 + 1e-5).all()
+
+
+class TestExportTrajectory:
+    """Tests for export_trajectory (STEPS T15)."""
+
+    def test_export_creates_files(self):
+        """Verify export_trajectory creates VTP files."""
+        # Create a simple trajectory: K=2 (3 snapshots), B=1, N=4
+        points = torch.randn(3, 1, 4, 3)  # [K+1=3, B=1, N=4, 3]
+        velocities = torch.randn(2, 1, 4, 3)  # [K=2, B=1, N=4, 3]
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 1, 2], [1, 2, 3]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = export_trajectory(traj, faces, transform, tmpdir)
+
+            # Should create K+1=3 files
+            assert len(paths) == 3
+            for p in paths:
+                assert os.path.exists(p)
+
+    def test_export_file_naming(self):
+        """Verify files are named step_0000.vtp, step_0001.vtp, etc."""
+        points = torch.randn(3, 1, 4, 3)
+        velocities = torch.randn(2, 1, 4, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = export_trajectory(traj, faces, transform, tmpdir)
+
+            # Check naming
+            assert paths[0].endswith("step_0000.vtp")
+            assert paths[1].endswith("step_0001.vtp")
+            assert paths[2].endswith("step_0002.vtp")
+
+    def test_export_denormalizes_points(self):
+        """Verify points are denormalized back to world coordinates."""
+        # Create trajectory with simple normalized points
+        points_norm = torch.tensor([
+            [[0.0, 0.0, 0.0]],  # Step 0, batch 0, point 0
+            [[0.5, 0.5, 0.5]],  # Step 1
+        ], dtype=torch.float32).reshape(2, 1, 1, 3)
+
+        velocities = torch.randn(1, 1, 1, 3)
+        traj = Trajectory(points=points_norm, velocities=velocities, dt=0.5)
+
+        # Transform that shifts center to [1, 2, 3] and scales by 2
+        transform = FrameTransform(
+            center=torch.tensor([1.0, 2.0, 3.0]),
+            scale=torch.tensor(2.0)
+        )
+
+        faces = torch.tensor([[0, 0, 0]], dtype=torch.int64)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_trajectory(traj, faces, transform, tmpdir)
+
+            # Load first file and check points
+            poly = load_vtp(os.path.join(tmpdir, "step_0000.vtp"))
+            points_np, _ = extract_vtp_points_cells(poly)
+
+            # Denormalized: (0 - 0) * 2 + [1, 2, 3] = [1, 2, 3]
+            expected = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)
+            assert np.allclose(points_np, expected, atol=1e-5)
+
+    def test_export_includes_velocity_field(self):
+        """Verify velocity is included as a point field."""
+        points = torch.randn(2, 1, 3, 3)
+        velocities = torch.tensor([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]])
+        velocities = velocities.reshape(1, 1, 3, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_trajectory(traj, faces, transform, tmpdir)
+
+            # Load step 1 (has actual velocity)
+            poly = load_vtp(os.path.join(tmpdir, "step_0001.vtp"))
+            fields = extract_vtp_point_fields(poly, ["velocity"])
+
+            # Velocity field should be present
+            assert fields["velocity"] is not None
+            assert fields["velocity"].shape == (3, 3)
+
+    def test_export_step_0_zero_velocity(self):
+        """Verify step 0 has zero velocity."""
+        points = torch.randn(2, 1, 3, 3)
+        velocities = torch.randn(1, 1, 3, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_trajectory(traj, faces, transform, tmpdir)
+
+            # Load step 0
+            poly = load_vtp(os.path.join(tmpdir, "step_0000.vtp"))
+            fields = extract_vtp_point_fields(poly, ["velocity"])
+
+            velocity = fields["velocity"]
+            # All velocities should be zero
+            assert np.allclose(velocity, 0.0, atol=1e-6)
+
+    def test_export_preserves_faces(self):
+        """Verify faces are preserved in exported files."""
+        points = torch.randn(2, 1, 4, 3)
+        velocities = torch.randn(1, 1, 4, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        # Define faces
+        faces = torch.tensor([[0, 1, 2], [1, 2, 3]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_trajectory(traj, faces, transform, tmpdir)
+
+            # Load any step and check faces
+            poly = load_vtp(os.path.join(tmpdir, "step_0000.vtp"))
+            _, faces_np = extract_vtp_points_cells(poly)
+
+            # Should have 2 faces (triangles)
+            assert faces_np.shape[0] == 2
+            assert faces_np.shape[1] == 3
+
+    def test_export_multiple_steps(self):
+        """Verify export handles multiple trajectory steps."""
+        # Create trajectory with K=5 (6 snapshots)
+        K = 5
+        points = torch.randn(K + 1, 1, 5, 3)
+        velocities = torch.randn(K, 1, 5, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=1.0 / K)
+
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = export_trajectory(traj, faces, transform, tmpdir)
+
+            # Should create K+1=6 files
+            assert len(paths) == K + 1
+
+            # All files should exist
+            for p in paths:
+                assert os.path.exists(p)
+
+    def test_export_creates_directory(self):
+        """Verify export creates out_dir if it doesn't exist."""
+        points = torch.randn(2, 1, 3, 3)
+        velocities = torch.randn(1, 1, 3, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outdir = os.path.join(tmpdir, "nested", "path")
+            # Directory does not exist yet
+            assert not os.path.exists(outdir)
+
+            export_trajectory(traj, faces, transform, outdir)
+
+            # Directory should have been created
+            assert os.path.exists(outdir)
+            # Files should exist
+            assert os.path.exists(os.path.join(outdir, "step_0000.vtp"))
+
+    def test_export_velocity_matches_trajectory(self):
+        """Verify exported velocities match trajectory velocities."""
+        points = torch.randn(3, 1, 2, 3)
+        velocities = torch.tensor([
+            [[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]],  # Step 1
+            [[[0.7, 0.8, 0.9], [1.0, 1.1, 1.2]]]   # Step 2
+        ], dtype=torch.float32).reshape(2, 1, 2, 3)
+        traj = Trajectory(points=points, velocities=velocities, dt=0.5)
+
+        faces = torch.tensor([[0, 0, 0]], dtype=torch.int64)
+        transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_trajectory(traj, faces, transform, tmpdir)
+
+            # Load step 1 and check velocity
+            poly = load_vtp(os.path.join(tmpdir, "step_0001.vtp"))
+            fields = extract_vtp_point_fields(poly, ["velocity"])
+            velocity_loaded = fields["velocity"]
+
+            expected = velocities[0, 0, :, :].numpy()
+            assert np.allclose(velocity_loaded, expected, atol=1e-6)

@@ -1,12 +1,15 @@
 """I/O for shapes and trajectories (STEPS T13+)."""
 
 from dataclasses import dataclass
+import os
 
 import torch
 import numpy as np
 
-from src.vtk.io import load_vtp
+from src.vtk.io import load_vtp, save_vtp
 from src.vtk.extract import extract_vtp_points_cells, extract_vtp_point_fields
+from src.vtk.create import create_polydata
+from src.vtk.fields import add_point_field
 
 
 @dataclass(frozen=True)
@@ -151,3 +154,52 @@ def joint_normalize(shapes, domain=(0, 1)):
         ))
 
     return normalized_shapes, transform
+
+
+def export_trajectory(traj, faces, transform, out_dir):
+    """Export trajectory steps as VTP files in world coordinates (STEPS T15).
+
+    Saves one VTP file per integration step with velocity as a point field.
+    Points are denormalized from normalized domain back to world coordinates.
+
+    Args:
+        traj: Trajectory object with points [K+1, B, N, 3] and velocities [K, B, N, 3]
+        faces: [F, 3] face indices carried to all steps
+        transform: FrameTransform used for normalization (inverted to denormalize)
+        out_dir: directory to save step_XXXX.vtp files
+
+    Returns:
+        List of saved file paths
+    """
+    os.makedirs(out_dir, exist_ok=True)
+
+    K_plus_1, B, N, _ = traj.points.shape
+    K = K_plus_1 - 1
+
+    saved_paths = []
+
+    for step in range(K_plus_1):
+        # Extract points for this step, batch 0: [N, 3]
+        points_norm = traj.points[step, 0, :, :]  # [N, 3]
+
+        # Denormalize to world coordinates
+        points_world = transform.invert(points_norm)  # [N, 3]
+
+        # Create PolyData with points and faces
+        polydata = create_polydata(points_world, faces)
+
+        # Add velocity as point field (zero for step 0, actual velocity for steps 1..K)
+        if step == 0:
+            velocity = torch.zeros(N, 3, dtype=torch.float32)
+        else:
+            velocity = traj.velocities[step - 1, 0, :, :]  # [N, 3]
+
+        polydata = add_point_field(polydata, velocity, field_name="velocity")
+
+        # Save as step_XXXX.vtp
+        filename = f"step_{step:04d}.vtp"
+        filepath = os.path.join(out_dir, filename)
+        save_vtp(polydata, filepath, binary=True)
+        saved_paths.append(filepath)
+
+    return saved_paths
