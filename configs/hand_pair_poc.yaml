@@ -1,0 +1,35 @@
+# Proof-of-concept: hand pair registration (STEP T17)
+# Registers two copies of the hand template (same geometry, tests correctness)
+# Use as template: adjust source/target paths and output_dir for your data
+
+source: data/hand/template.vtp
+target: data/hand/template.vtp
+output_dir: ./outputs/hand_pair_poc
+
+# Field: time-varying velocity field with K=10 integration steps
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 256
+  activation: relu
+
+# Code: no additional shape code (registration only)
+code:
+  kind: none
+
+# Loss: L2 point-to-point distance with kinetic energy regularization
+loss:
+  data_name: l2
+  data_kwargs: {}
+  sigma: 0.1
+  kinetic_weight: 0.01
+  code_reg_weight: 0.0
+
+# Training: 500 steps with Adam at lr=1e-4, seed for reproducibility
+train:
+  mode: pair
+  steps: 500
+  lr: 0.0001
+  seed: 42
+  log_every: 50
+  save_every: 100
