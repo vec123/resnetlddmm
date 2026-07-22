@@ -18,3 +18,6 @@ Registry.register("field", "time_varying", "src.resnet_lddmm.fields.time_varying
 # STEPS T9: DataTerm + CDData + L2Data
 Registry.register("data_term", "chamfer", "src.resnet_lddmm.losses.data_terms:CDData")
 Registry.register("data_term", "l2", "src.resnet_lddmm.losses.data_terms:L2Data")
+
+# STEPS T10: ShapeCode + NoCode
+Registry.register("code", "none", "src.resnet_lddmm.codes.none:NoCode")
