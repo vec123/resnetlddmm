@@ -1,0 +1,36 @@
+# Proof-of-concept: hand pair registration with isometry constraint
+# Same as hand_pair_poc but with isometry regularization enabled
+
+source: data/hand/template.vtp
+target: data/hand/target_3.vtp
+output_dir: ./outputs/hand_pair_poc_iso_111
+
+field:
+  kind: stationary
+  num_steps: 20
+  width: 512
+  activation: relu
+
+code:
+  kind: none
+
+loss:
+  data_name: emd
+  data_kwargs:
+    p: 1
+    blur: 0.01
+    backend: auto
+  sigma: 0.02
+  kinetic_weight: 0.000001
+  code_reg_weight: 0.0
+  isometry_weight: 10
+  isometry_type: det
+  isometry_samples: 64  # Sample 64 points per step for ~5x speedup
+
+train:
+  mode: pair
+  steps: 5000
+  lr: 0.0001
+  seed: 42
+  log_every: 10
+  save_every: 100

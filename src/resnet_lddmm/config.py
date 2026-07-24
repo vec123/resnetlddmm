@@ -4,9 +4,9 @@ from typing import Optional
 
 @dataclass
 class FieldCfg:
-    kind: str = "time_varying"              # Registry name
+    kind: str = "time_varying"              # time_varying | stationary
     num_steps: int = 10                     # K — configured in ONE place
-    width: int = 512                        # time_varying block width
+    width: int = 512                        # block width (ignored by stationary)
     activation: str = "relu"
     fa: tuple = (64, 64, 64)                # stationary: FA-NN layer widths
     df: tuple = (256, 256, 256, 256, 256)   # DF-NN layer widths
@@ -24,14 +24,16 @@ class CodeCfg:
 
 @dataclass
 class LossCfg:
-    data_name: str = "chamfer"
+    data_name: str = "chamfer"              # chamfer | l2 | emd
     data_kwargs: dict = dataclass_field(default_factory=dict)
     direction: str = "forward"              # forward | bidirectional
     sigma: float = 0.1                      # data weight = 1/(2σ²), named per D4
     kinetic_weight: float = 1.0
     code_reg_weight: float = 0.0
     weight_decay: float = 0.0               # Θ only — see Phase 6
-
+    isometry_weight: float = 0.0  # ← disabled by default
+    isometry_type: str = "strain"  # or "det" / "orthogonal"
+    isometry_samples: int = 64  # points per step for isometry (64 = ~5x speedup)
 
 @dataclass
 class TrainCfg:

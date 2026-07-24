@@ -205,33 +205,37 @@ class IsometryLoss(FlowTerm):
     - "orthogonal": mean(||J - R_closest||_F^2), encourages rigid (SO(3)) maps
     """
 
-    def __init__(self, loss_type: str = "strain"):
+    def __init__(self, loss_type: str = "strain", sample_points: int = 64):
         super().__init__()
         if loss_type not in ("strain", "det", "orthogonal"):
             raise ValueError(f"loss_type must be 'strain', 'det', or 'orthogonal', got {loss_type}")
         self.loss_type = loss_type
+        self.sample_points = sample_points
 
     def forward(self, trajectory: Trajectory, field: VelocityField) -> Tensor:
         """Compute isometry penalty using finite differences for jacobian.
 
-        Avoids explicit jacobian tensor formation to ensure gradient flow.
+        Samples a subset of points to reduce computational cost.
         """
         points = trajectory.points.detach()
         K = points.shape[0] - 1
         B, N = points.shape[1], points.shape[2]
 
-        # Collect losses from all steps and points
+        # Sample points for efficiency
+        n_sample = min(self.sample_points, N)
+        indices = torch.randperm(N, device=points.device)[:n_sample]
+
         all_losses = []
 
         # For each step
         for k in range(K):
             x = points[k]  # [B, N, 3]
 
-            # Process each point individually
+            # Process each batch and sampled point
             for b in range(B):
-                for n in range(N):
-                    x_bn = x[b, n:n+1, :].clone()  # [1, 3]
-                    x_bn.requires_grad_(True)  # CRITICAL: enable gradients on input
+                for idx in indices:
+                    x_bn = x[b, idx:idx+1, :].clone()  # [1, 3]
+                    x_bn.requires_grad_(True)
 
                     # Create a wrapper for this point
                     def field_fn(x_):

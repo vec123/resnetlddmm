@@ -18,11 +18,38 @@ from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
 from src.resnet_lddmm.flow import NeuralODEFlow
 from src.resnet_lddmm.integrators import ForwardEuler
-from src.resnet_lddmm import registrations  # Load component registrations
+from src.resnet_lddmm import registrations  #  Side effect: registers all component Load component registrations
 from src.learning.registry import Registry
 from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
+from src.learning.callbacks.base import Callback
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback
+
+
+class VerboseCallback(Callback):
+    """Log loss progression during training."""
+
+    def __init__(self, log_every=1):
+        super().__init__(every_n_steps=log_every)
+
+    def on_step_end(self, ctx, step, metrics, batch, pred):
+        """Print loss at cadence."""
+        if not self._due(step):
+            return
+        loss = metrics.get("loss", 0.0)
+        progress = f"Step {step+1:4d}/{ctx.num_steps} | loss: {loss:.6f}"
+
+        # Add any other metrics
+        for key in sorted(metrics.keys()):
+            if key != "loss" and not key.startswith("diag/"):
+                progress += f" | {key}: {metrics[key]:.6f}"
+
+        print(progress)
+
+    def _due(self, step):
+        """Check if we should log this step."""
+        return step % self.every_n_steps == 0 or step == 0
 
 
 def seed_everything(seed):
@@ -57,11 +84,12 @@ def build(cfg: ExperimentCfg):
     source_norm, target_norm = normalized
 
     # Create loader with normalized shapes
-    # SimpleBatch duck-typing: has .points and .weights
+    # SimpleBatch duck-typing: has .points, .weights, and .faces
     class SimpleBatch:
         def __init__(self, shape):
             self.points = shape.points  # [1, N, 3]
             self.weights = shape.weights
+            self.faces = shape.faces  # [F, 3] for trajectory export
 
     loader = OneBatchLoader((SimpleBatch(source_norm), SimpleBatch(target_norm)))
 
@@ -86,26 +114,37 @@ def build(cfg: ExperimentCfg):
     # Registry.create: code source
     code_source = Registry.create("code", cfg.code.kind)
 
-    # Registry.create: data term
+    # Registry.create: data term and isometry loss
     data_term = Registry.create(
         "data_term", cfg.loss.data_name,
         **cfg.loss.data_kwargs
     )
 
+    # Create isometry loss if enabled
+    iso_loss = None
+    if cfg.loss.isometry_weight > 0:
+        iso_kwargs = {"loss_type": cfg.loss.isometry_type}
+        # Add sample_points if specified in config
+        if hasattr(cfg.loss, "isometry_samples"):
+            iso_kwargs["sample_points"] = cfg.loss.isometry_samples
+        iso_loss = Registry.create("iso_loss", "isometry", **iso_kwargs)
+
     # Build loss composer
     # Data weight is 1/(2σ²) per D4 invariant
     data_weight = 1.0 / (2 * cfg.loss.sigma**2)
-    composer = LossComposer([
+    terms = [
         LossTerm("data", weight=data_weight),
         LossTerm("kinetic", weight=cfg.loss.kinetic_weight),
         LossTerm("code_reg", weight=cfg.loss.code_reg_weight),
-    ])
+        LossTerm("isometry", weight=cfg.loss.isometry_weight),
+    ]
+    composer = LossComposer(terms)
 
     # Create optimizer
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr)
 
     # Create stepper
-    stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+    stepper = PairRegistration(flow, code_source, data_term, composer, optimizer, iso_loss=iso_loss)
 
     # Dump config to output dir for provenance
     config_path = os.path.join(cfg.output_dir, "config.json")
@@ -125,6 +164,8 @@ def build(cfg: ExperimentCfg):
                 "sigma": cfg.loss.sigma,
                 "kinetic_weight": cfg.loss.kinetic_weight,
                 "code_reg_weight": cfg.loss.code_reg_weight,
+                "isometry_weight": cfg.loss.isometry_weight,
+                "isometry_type": cfg.loss.isometry_type,
             },
             "train": {
                 "steps": cfg.train.steps,
@@ -133,7 +174,7 @@ def build(cfg: ExperimentCfg):
             },
         }, f, indent=2)
 
-    return stepper, loader
+    return stepper, loader, transform
 
 
 def run(cfg: ExperimentCfg, callbacks=None):
@@ -141,13 +182,28 @@ def run(cfg: ExperimentCfg, callbacks=None):
 
     Args:
         cfg: ExperimentCfg instance
-        callbacks: optional list of callbacks (default: empty)
+        callbacks: optional list of callbacks (default: VerboseCallback + TrajectoryExporter + DiagnosticsCallback)
 
     Returns:
         TrainingContext from orchestrator.run
     """
-    callbacks = callbacks or []
-    stepper, loader = build(cfg)
+    if callbacks is None:
+        # Default callbacks: verbose logging, trajectory export, diagnostics
+        log_every = getattr(cfg.train, 'log_every', 50)
+        save_every = getattr(cfg.train, 'save_every', 100)
+        callbacks = [
+            VerboseCallback(log_every=log_every),
+            TrajectoryExporter(every_n_steps=save_every),
+            DiagnosticsCallback(every_n_steps=save_every),
+        ]
+
+    stepper, loader, transform = build(cfg)
+
+    # Pass transform to TrajectoryExporter
+    for cb in callbacks:
+        if isinstance(cb, TrajectoryExporter):
+            cb.transform = transform
+
     orchestrator = TrainingOrchestrator(
         stepper=stepper,
         dataloader=loader,
