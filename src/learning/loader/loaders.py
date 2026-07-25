@@ -1,4 +1,5 @@
 import torch
+from dataclasses import dataclass
 
 class CohortLoader:
     """Load cohort shapes with graphs, mini-batched over sources.
@@ -157,3 +158,65 @@ class ResamplingGraphLoader:
                 yield (graph_a, super_a, verts, mask, graph_b, super_b)
             else:
                 yield (graph_a, super_a, verts, mask)
+
+
+@dataclass
+class CohortBatch:
+    """Batch of shapes with points, shape_ids, and optional weights."""
+    points: torch.Tensor
+    shape_ids: torch.Tensor
+    weights: torch.Tensor = None
+
+
+class CohortBatchLoader:
+    """Yields batches of cohort shapes for CohortRegistration training.
+
+    Mini-batches shapes over cohort members, yielding (source_batch, target_batch) tuples
+    where source_batch is a CohortBatch with shape_ids and target_batch has template points.
+    Shapes are kept separate in the batch dimension: [B, N, 3] not concatenated.
+    """
+    def __init__(self, cohort_shapes, template, batch_size=None, rng=None):
+        """Initialize cohort batch loader.
+
+        Args:
+            cohort_shapes: list of Shape objects (cohort members)
+            template: Shape object (target template)
+            batch_size: mini-batch size over cohort, or None for full batch
+            rng: torch.Generator for reproducible mini-batching (optional)
+        """
+        self.cohort_shapes = cohort_shapes
+        self.template = template
+        self.batch_size = batch_size or len(cohort_shapes)
+        self.rng = rng
+        self.n_shapes = len(cohort_shapes)
+
+    def _pick_indices(self):
+        """Draw a fresh random subset of cohort indices."""
+        n = self.n_shapes
+        if self.batch_size >= n:
+            return torch.arange(n)
+        return torch.randperm(n, generator=self.rng)[:self.batch_size]
+
+    def __iter__(self):
+        while True:
+            indices = self._pick_indices()
+            selected_shapes = [self.cohort_shapes[i] for i in indices]
+
+            # Stack points [B, N, 3] and create shape_ids [B]
+            points = torch.stack([s.points.squeeze(0) for s in selected_shapes], dim=0)  # [B, N, 3]
+            shape_ids = torch.arange(len(selected_shapes), dtype=torch.long)  # [B] = [0, 1, 2, ...]
+
+            # Optionally stack weights
+            weights = None
+            if selected_shapes[0].weights is not None:
+                weights = torch.stack([s.weights.squeeze(0) for s in selected_shapes], dim=0)
+
+            # Create target batch (template)
+            target_batch = CohortBatch(
+                points=self.template.points,  # [1, M, 3]
+                shape_ids=torch.tensor([0], dtype=torch.long),  # [1]
+                weights=self.template.weights
+            )
+
+            source_batch = CohortBatch(points=points, shape_ids=shape_ids, weights=weights)
+            yield source_batch, target_batch

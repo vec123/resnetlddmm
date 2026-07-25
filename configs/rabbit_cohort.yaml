@@ -1,0 +1,44 @@
+source: data/rabbit/cohort
+target: data/rabbit/template.obj
+output_dir: outputs/rabbit_cohort
+
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 512
+  activation: relu
+  fa: [64, 64, 64]
+  df: [256, 256, 256, 256, 256]
+  fourier_n_e: 3
+
+code:
+  kind: auto_decoder
+  n_z: 256
+  conditioning: none
+  grid: 2
+  grid_channels: 32
+
+loss:
+  data_name: chamfer
+  data_kwargs: {}
+  direction: bidirectional
+  sigma: 0.1
+  kinetic_weight: 1.0
+  code_reg_weight: 0.01
+  weight_decay: 1e-4
+  isometry_weight: 0.0
+  isometry_type: strain
+  isometry_samples: 64
+  subsample_M: 2000
+  subsample_a: 0.15
+
+train:
+  mode: cohort
+  steps: 2000
+  batch: 4
+  subsample: 0
+  lr: 1e-4
+  seed: 42
+  log_every: 50
+  save_every: 500
+  val_every: 0

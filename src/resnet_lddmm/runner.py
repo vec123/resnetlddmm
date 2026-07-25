@@ -8,6 +8,7 @@ Does NOT import config directly; reads attributes dynamically (layering rule).
 
 import os
 import json
+import glob
 import random
 
 import numpy as np
@@ -16,13 +17,14 @@ import torch
 from src.resnet_lddmm.config import ExperimentCfg
 from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
+from src.resnet_lddmm.registration.cohort import CohortRegistration
 from src.resnet_lddmm.flow import NeuralODEFlow
 from src.resnet_lddmm.integrators import ForwardEuler, ModifiedEuler
 from src.resnet_lddmm.losses import UnidirectionalMappingError, BidirectionalMappingError
 from src.resnet_lddmm import registrations  #  Side effect: registers all component Load component registrations
 from src.learning.registry import Registry
 from src.learning.losses.composer import LossComposer, LossTerm
-from src.learning.loader.loaders import OneBatchLoader
+from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
 from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback
@@ -73,28 +75,12 @@ def build(cfg: ExperimentCfg):
         cfg: ExperimentCfg with source/target paths and component kinds
 
     Returns:
-        PairRegistration stepper ready for training
+        (stepper, loader, transform) where stepper is PairRegistration or CohortRegistration
     """
     seed_everything(cfg.train.seed)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
-    # Load and normalize shapes
-    source_shape = load_shape(cfg.source)
-    target_shape = load_shape(cfg.target)
-    normalized, transform = joint_normalize([source_shape, target_shape])
-    source_norm, target_norm = normalized
-
-    # Create loader with normalized shapes
-    # SimpleBatch duck-typing: has .points, .weights, and .faces
-    class SimpleBatch:
-        def __init__(self, shape):
-            self.points = shape.points  # [1, N, 3]
-            self.weights = shape.weights
-            self.faces = shape.faces  # [F, 3] for trajectory export
-
-    loader = OneBatchLoader((SimpleBatch(source_norm), SimpleBatch(target_norm)))
-
-    # Registry.create: field and integrators
+    # Registry.create: field and integrators (shared across pair/cohort)
     if cfg.field.kind == "stationary":
         field = Registry.create("field", "stationary", activation=cfg.field.activation)
     else:
@@ -105,9 +91,9 @@ def build(cfg: ExperimentCfg):
             activation=cfg.field.activation
         )
     integrator_direct = ForwardEuler()
-    integrator_inverse = ModifiedEuler() 
+    integrator_inverse = ModifiedEuler()
 
-    # Build flow
+    # Build flow (shared across pair/cohort)
     flow = NeuralODEFlow(
         field=field,
         direct=integrator_direct,
@@ -115,18 +101,14 @@ def build(cfg: ExperimentCfg):
         num_steps=cfg.field.num_steps
     )
 
-    # Registry.create: code source
-    code_source = Registry.create("code", cfg.code.kind)
-
-    # Registry.create: data term and isometry loss
+    # Registry.create: data term and isometry loss (shared)
     data_term = Registry.create(
         "data_term", cfg.loss.data_name,
         **cfg.loss.data_kwargs
     )
     iso_loss = Registry.create("iso_loss", "isometry", **cfg.loss.iso_kwargs) if cfg.loss.isometry_weight > 0 else None
 
-    # Build loss composer
-    # Data weight is 1/(2σ²) per D4 invariant
+    # Build loss composer (shared)
     data_weight = 1.0 / (2 * cfg.loss.sigma**2)
     terms = [
         LossTerm("data", weight=data_weight),
@@ -136,22 +118,94 @@ def build(cfg: ExperimentCfg):
     ]
     composer = LossComposer(terms)
 
-    # Create optimizer
-    optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr)
-
-    # Create mapping error strategy based on config
+    # Create mapping error strategy (shared)
     if cfg.loss.direction == "bidirectional":
         mapping_error = BidirectionalMappingError()
     else:  # default to forward
         mapping_error = UnidirectionalMappingError()
 
+    # Branch on training mode
+    if cfg.train.mode == "cohort":
+        return _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss)
+    else:
+        return _build_pair(cfg, flow, data_term, mapping_error, composer, iso_loss)
+
+
+def _build_pair(cfg, flow, data_term, mapping_error, composer, iso_loss):
+    """Build PairRegistration stepper."""
+    # Load and normalize shapes
+    source_shape = load_shape(cfg.source)
+    target_shape = load_shape(cfg.target)
+    normalized, transform = joint_normalize([source_shape, target_shape])
+    source_norm, target_norm = normalized
+
+    # Create loader with normalized shapes
+    class SimpleBatch:
+        def __init__(self, shape):
+            self.points = shape.points  # [1, N, 3]
+            self.weights = shape.weights
+            self.faces = shape.faces  # [F, 3] for trajectory export
+
+    loader = OneBatchLoader((SimpleBatch(source_norm), SimpleBatch(target_norm)))
+
+    # Registry.create: code source
+    code_source = Registry.create("code", cfg.code.kind)
+
+    # Create optimizer (single param group)
+    optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr, weight_decay=cfg.loss.weight_decay)
+
     # Create stepper
     stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss)
 
-    # Dump config to output dir for provenance
+    # Dump config to output dir
+    _dump_config(cfg, "pair")
+
+    return stepper, loader, transform
+
+
+def _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss):
+    """Build CohortRegistration stepper."""
+    # Load all cohort shapes from directory
+    cohort_paths = sorted(glob.glob(os.path.join(cfg.source, "*.obj"))) + \
+                   sorted(glob.glob(os.path.join(cfg.source, "*.ply")))
+    if not cohort_paths:
+        raise ValueError(f"No shape files found in {cfg.source}")
+
+    cohort_shapes = [load_shape(p) for p in cohort_paths]
+    target_shape = load_shape(cfg.target)
+
+    # Normalize cohort + template together
+    normalized, transform = joint_normalize(cohort_shapes + [target_shape])
+    cohort_norm = normalized[:-1]
+    target_norm = normalized[-1]
+
+    # Create loader for cohort
+    loader = CohortBatchLoader(cohort_norm, target_norm, batch_size=cfg.train.batch)
+
+    # Registry.create: code source (must be AutoDecoderCodes for cohort)
+    code_source = Registry.create("code", cfg.code.kind, n_shapes=len(cohort_norm), n_z=cfg.code.n_z)
+
+    # Create optimizer with two param groups: flow with weight_decay, codes without
+    optimizer = torch.optim.Adam([
+        {"params": flow.parameters(), "weight_decay": cfg.loss.weight_decay},
+        {"params": code_source.parameters(), "weight_decay": 0.0},
+    ], lr=cfg.train.lr)
+
+    # Create stepper
+    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss)
+
+    # Dump config to output dir
+    _dump_config(cfg, "cohort")
+
+    return stepper, loader, transform
+
+
+def _dump_config(cfg, mode):
+    """Dump config to output dir for provenance."""
     config_path = os.path.join(cfg.output_dir, "config.json")
     with open(config_path, "w") as f:
         json.dump({
+            "mode": mode,
             "source": cfg.source,
             "target": cfg.target,
             "field": {
@@ -176,8 +230,6 @@ def build(cfg: ExperimentCfg):
                 "seed": cfg.train.seed,
             },
         }, f, indent=2)
-
-    return stepper, loader, transform
 
 
 def run(cfg: ExperimentCfg, callbacks=None):
