@@ -1,5 +1,73 @@
-
 import torch
+
+class CohortLoader:
+    """Load cohort shapes with graphs, mini-batched over sources.
+
+    Converts cohort Shape objects → graph/super_graph/shape tuples, with optional
+    mini-batching over cohort members. Designed to feed both CohortRegistration (T27+)
+    and encoder integration (T29+).
+
+    Yields: (graph, super_graph, source_shape_or_list, template_shape)
+    where source is a single Shape if batch_size=1, or list of Shapes if batch_size>1.
+    The graph is precomputed for encoder use.
+    """
+    def __init__(self, cohort_shapes, template, builder,
+                 rng=None, batch_size=None):
+        """Initialize cohort loader.
+
+        Args:
+            cohort_shapes: list of Shape objects (cohort members)
+            template: Shape object (target template)
+            builder: GraphBuilder instance for graph construction
+            rng: torch.Generator for reproducible mini-batching (optional)
+            batch_size: mini-batch size over cohort, or None for full batch each step
+        """
+        self.cohort_shapes = cohort_shapes
+        self.template = template
+        self.builder = builder
+        self.rng = rng
+        self.batch_size = batch_size
+        self.n_shapes = len(cohort_shapes)
+
+    def _pick_indices(self):
+        """Draw a fresh random subset of cohort indices, or None for full batch."""
+        n = self.n_shapes
+        if self.batch_size is None or self.batch_size >= n:
+            return None
+        return torch.randperm(n, generator=self.rng)[:self.batch_size]
+
+    def __iter__(self):
+        while True:
+            indices = self._pick_indices()
+
+            # Select cohort members
+            if indices is None:
+                selected_shapes = self.cohort_shapes
+            else:
+                selected_shapes = [self.cohort_shapes[i] for i in indices]
+
+            # Concatenate vertices/mask/areas/normals from selected shapes for graph construction
+            vertices = torch.cat([s.points for s in selected_shapes], dim=0)
+            mask = torch.ones(vertices.shape[0], dtype=torch.bool)
+
+            areas = None
+            if selected_shapes[0].weights is not None:
+                areas = torch.cat([s.weights for s in selected_shapes], dim=0)
+
+            normals = None
+            if selected_shapes[0].normals is not None:
+                normals = torch.cat([s.normals for s in selected_shapes], dim=0)
+
+            # Build graphs over concatenated vertices
+            graph, super_graph = self.builder.build(vertices, mask, self.rng,
+                                                     areas=areas, normals=normals)
+
+            # Yield graph + original Shape objects (which have correct faces/weights/normals)
+            if len(selected_shapes) == 1:
+                yield (graph, super_graph, selected_shapes[0], self.template)
+            else:
+                yield (graph, super_graph, selected_shapes, self.template)
+
 
 class OneBatchLoader:
     """Yields the same prebuilt (graph, true_verts, mask) batch each step."""
