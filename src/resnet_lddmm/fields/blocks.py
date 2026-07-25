@@ -1,5 +1,6 @@
 """Building blocks for velocity fields."""
 
+from typing import List
 import torch
 import torch.nn as nn
 
@@ -50,3 +51,48 @@ class FourierFeatures(nn.Module):
         cos_parts = angles.cos().flatten(-2)
         # Concatenate: [h, sin, cos] -> [..., d + d*n_e + d*n_e] = [..., (2*n_e + 1)*d]
         return torch.cat([h, sin_parts, cos_parts], dim=-1)
+
+
+def mlp(dims: List[int], act: str = "relu", final_bias: bool = True) -> nn.Sequential:
+    """Build a multi-layer perceptron.
+
+    Args:
+        dims: list of layer dimensions [in, h1, h2, ..., out]
+        act: activation function name ("relu" | "leaky_relu")
+        final_bias: whether final layer has bias
+
+    Returns:
+        Sequential module with intermediate activations, final layer has no activation.
+    """
+    activation = {
+        "relu": nn.ReLU(),
+        "leaky_relu": nn.LeakyReLU(0.2),
+    }[act]
+
+    layers = []
+    for i in range(len(dims) - 1):
+        is_final = (i == len(dims) - 2)
+        layers.append(nn.Linear(dims[i], dims[i + 1], bias=final_bias or not is_final))
+        if not is_final:
+            layers.append(activation)
+
+    return nn.Sequential(*layers)
+
+
+def last_linear(module: nn.Module) -> nn.Linear:
+    """Extract the last Linear layer from a module.
+
+    Recursively searches for the last Linear layer in Sequential or nested modules.
+    """
+    if isinstance(module, nn.Linear):
+        return module
+    if isinstance(module, nn.Sequential):
+        for layer in reversed(module):
+            if isinstance(layer, nn.Linear):
+                return layer
+    # Fallback: search all children
+    for child in reversed(list(module.children())):
+        result = last_linear(child)
+        if result is not None:
+            return result
+    return None

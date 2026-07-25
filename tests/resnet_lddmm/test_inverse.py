@@ -16,7 +16,7 @@ def time_varying_field():
 @pytest.fixture
 def stationary_field():
     """Create a stationary velocity field for testing."""
-    return StationaryField(num_blocks=10, width=64, activation="relu")
+    return StationaryField(fa=(32, 32), df=(64, 64), fourier_n_e=2, activation="leaky_relu")
 
 
 @pytest.fixture
@@ -201,7 +201,7 @@ class TestInverseDiagnostic:
         from src.resnet_lddmm.diagnostics import inverse_residual
 
         # Create a simple flow
-        field = StationaryField(num_blocks=5, width=32, activation="relu")
+        field = StationaryField(fa=(16,), df=(32,), fourier_n_e=1, activation="leaky_relu")
         flow = NeuralODEFlow(
             field=field,
             direct=ForwardEuler(),

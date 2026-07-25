@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch import Tensor
 
 from src.resnet_lddmm.fields.base import VelocityField
-from src.resnet_lddmm.fields.blocks import VelocityBlock
+from src.resnet_lddmm.fields.blocks import VelocityBlock, FourierFeatures, mlp, last_linear
 from src.resnet_lddmm.conditioning.base import Conditioning, NoConditioning
 
 
@@ -50,29 +50,50 @@ class TimeVaryingField(VelocityField):
 
 
 class StationaryField(VelocityField):
-    """Stationary velocity field: same f(x) at all time steps.
+    """AD-SVFD: FA-NN(x ⊕ z̄) → FourierFeatures → DF-NN(feats ⊕ z̄) → v.
 
-    Useful for ablations and comparison with ODENet-style methods.
-    Ignores the step parameter; computes the same velocity regardless of time.
+    One net, reused at every step (step ignored) — ~278k params at defaults.
+    STEPS T23.
     """
 
     def __init__(
         self,
-        num_blocks: int = 10,
-        width: int = 512,
-        activation: str = "relu",
+        fa: tuple = (64, 64, 64),
+        df: tuple = (256, 256, 256, 256, 256),
+        fourier_n_e: int = 3,
+        activation: str = "leaky_relu",
         conditioning: Optional[Conditioning] = None,
     ):
+        """Initialize stationary field with FA-NN → Fourier → DF-NN pipeline.
+
+        Args:
+            fa: layer widths for feature activation MLP
+            df: layer widths for deformation field MLP
+            fourier_n_e: Fourier encoding parameter (n_e)
+            activation: activation function ("relu" | "leaky_relu")
+            conditioning: optional conditioning module (default: NoConditioning)
+        """
         super().__init__()
         self.conditioning = conditioning or NoConditioning()
-        in_dim = 3 + self.conditioning.dim
-        # Single block used at all time steps; num_blocks parameter is ignored
-        self.block = VelocityBlock(in_dim, width, activation)
+        c = self.conditioning.dim
+
+        # FA-NN: [3 + c] -> ... -> fa[-1]
+        self.fa = mlp([3 + c, *fa], act=activation)
+
+        # Fourier features on FA output
+        self.fourier = FourierFeatures(fourier_n_e)
+        fpe_dim = (2 * fourier_n_e + 1) * fa[-1]
+
+        # DF-NN: [fpe_dim + c] -> ... -> 3
+        self.df = mlp([fpe_dim + c, *df, 3], act=activation, final_bias=False)
+
+        # Identity at init: zero-init the final layer
+        nn.init.zeros_(last_linear(self.df).weight)
 
     def forward(
         self, x: Tensor, step: Optional[int] = None, code: Optional[Tensor] = None
     ) -> Tensor:
-        """Compute velocity using the same block at all time steps.
+        """Compute velocity via FA-NN → Fourier → DF-NN pipeline.
 
         Args:
             x: [B, N, 3] point positions
@@ -84,7 +105,16 @@ class StationaryField(VelocityField):
         """
         # Get per-point conditioning features (None under NoConditioning)
         zbar = self.conditioning(x, code)
-        # Concatenate position with conditioning if present
+
+        # FA input: [x ⊕ z̄]
         h = x if zbar is None else torch.cat([x, zbar], dim=-1)
-        # Apply the same block regardless of step
-        return self.block(h)
+
+        # FA-NN → Fourier features
+        feats = self.fourier(self.fa(h))
+
+        # DF input: [Fourier(FA) ⊕ z̄]
+        if zbar is not None:
+            feats = torch.cat([feats, zbar], dim=-1)
+
+        # DF-NN → velocity
+        return self.df(feats)
