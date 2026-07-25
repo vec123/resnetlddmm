@@ -32,11 +32,12 @@ class TrajectoryExporter(Callback):
         traj = pred
 
         # Get batch geometry for faces
-        source, _ = batch
-        faces = source.faces if hasattr(source, "faces") else None
+        source, target = batch
+        source_faces = source.faces if hasattr(source, "faces") else None
+        target_faces = target.faces if hasattr(target, "faces") else None
 
-        if faces is None:
-            print(f"[TrajectoryExporter] Step {step}: no faces, skipping")
+        if source_faces is None:
+            print(f"[TrajectoryExporter] Step {step}: no source faces, skipping")
             return
 
         # Use actual transform from runner, or identity if not set
@@ -46,12 +47,25 @@ class TrajectoryExporter(Callback):
         else:
             transform = self.transform
 
-        out_dir = f"{ctx.log_dir}/trajectories/step_{step}"
+        base_out_dir = f"{ctx.log_dir}/trajectories/step_{step}"
 
         try:
-            print(f"[TrajectoryExporter] Exporting trajectory to {out_dir}")
-            export_trajectory(traj, faces, transform, out_dir)
-            print(f"[TrajectoryExporter] Successfully exported trajectory")
+            # Export forward trajectory
+            fwd_dir = f"{base_out_dir}/forward"
+            print(f"[TrajectoryExporter] Exporting forward trajectory to {fwd_dir}")
+            export_trajectory(traj, source_faces, transform, fwd_dir)
+            print(f"[TrajectoryExporter] Successfully exported forward trajectory")
+
+            # Export backward trajectory if bidirectional mode
+            stepper = ctx.stepper
+            if hasattr(stepper, "backward_traj") and stepper.backward_traj is not None:
+                bwd_dir = f"{base_out_dir}/backward"
+                print(f"[TrajectoryExporter] Exporting backward trajectory to {bwd_dir}")
+                if target_faces is not None:
+                    export_trajectory(stepper.backward_traj, target_faces, transform, bwd_dir)
+                else:
+                    export_trajectory(stepper.backward_traj, source_faces, transform, bwd_dir)
+                print(f"[TrajectoryExporter] Successfully exported backward trajectory")
         except Exception as e:
             print(f"[TrajectoryExporter] Export failed: {e}")
             import traceback

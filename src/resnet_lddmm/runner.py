@@ -18,6 +18,7 @@ from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
 from src.resnet_lddmm.flow import NeuralODEFlow
 from src.resnet_lddmm.integrators import ForwardEuler, ModifiedEuler
+from src.resnet_lddmm.losses import UnidirectionalMappingError, BidirectionalMappingError
 from src.resnet_lddmm import registrations  #  Side effect: registers all component Load component registrations
 from src.learning.registry import Registry
 from src.learning.losses.composer import LossComposer, LossTerm
@@ -94,12 +95,15 @@ def build(cfg: ExperimentCfg):
     loader = OneBatchLoader((SimpleBatch(source_norm), SimpleBatch(target_norm)))
 
     # Registry.create: field and integrators
-    field = Registry.create(
-        "field", cfg.field.kind,
-        num_blocks=cfg.field.num_steps,
-        width=cfg.field.width,
-        activation=cfg.field.activation
-    )
+    if cfg.field.kind == "stationary":
+        field = Registry.create("field", "stationary", activation=cfg.field.activation)
+    else:
+        field = Registry.create(
+            "field", cfg.field.kind,
+            num_blocks=cfg.field.num_steps,
+            width=cfg.field.width,
+            activation=cfg.field.activation
+        )
     integrator_direct = ForwardEuler()
     integrator_inverse = ModifiedEuler() 
 
@@ -119,7 +123,7 @@ def build(cfg: ExperimentCfg):
         "data_term", cfg.loss.data_name,
         **cfg.loss.data_kwargs
     )
-    iso_loss = Registry.create("iso_loss", "isometry", **cfg.loss.iso_kwargs)
+    iso_loss = Registry.create("iso_loss", "isometry", **cfg.loss.iso_kwargs) if cfg.loss.isometry_weight > 0 else None
 
     # Build loss composer
     # Data weight is 1/(2σ²) per D4 invariant
@@ -135,8 +139,14 @@ def build(cfg: ExperimentCfg):
     # Create optimizer
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr)
 
+    # Create mapping error strategy based on config
+    if cfg.loss.direction == "bidirectional":
+        mapping_error = BidirectionalMappingError()
+    else:  # default to forward
+        mapping_error = UnidirectionalMappingError()
+
     # Create stepper
-    stepper = PairRegistration(flow, code_source, data_term, composer, optimizer, iso_loss=iso_loss)
+    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss)
 
     # Dump config to output dir for provenance
     config_path = os.path.join(cfg.output_dir, "config.json")
@@ -153,6 +163,7 @@ def build(cfg: ExperimentCfg):
             "code": {"kind": cfg.code.kind},
             "loss": {
                 "data_name": cfg.loss.data_name,
+                "direction": cfg.loss.direction,
                 "sigma": cfg.loss.sigma,
                 "kinetic_weight": cfg.loss.kinetic_weight,
                 "code_reg_weight": cfg.loss.code_reg_weight,

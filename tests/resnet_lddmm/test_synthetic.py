@@ -17,6 +17,7 @@ from src.resnet_lddmm.integrators import ForwardEuler
 from src.resnet_lddmm.fields.time_varying import TimeVaryingField
 from src.resnet_lddmm.codes.none import NoCode
 from src.resnet_lddmm.losses.data_terms import L2Data, CDData
+from src.resnet_lddmm.losses import UnidirectionalMappingError
 from src.learning.losses.composer import LossTerm, LossComposer
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.loader.loaders import OneBatchLoader
@@ -107,7 +108,7 @@ class TestSyntheticTranslation:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         # Train
         initial_loss = None
@@ -146,7 +147,7 @@ class TestSyntheticTranslation:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         initial_loss = None
         for step in range(20):
@@ -188,7 +189,7 @@ class TestSyntheticRotation:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         # Train
         for _ in range(20):
@@ -229,7 +230,7 @@ class TestKineticEnergyTradeoff:
                 LossTerm("code_reg", weight=1.0),
             ])
             optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-            stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+            stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
             # Train to convergence
             steps = 100 if num_steps == 5 else 100
@@ -278,7 +279,7 @@ class TestSyntheticWithOrchestrator:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         # Create loader and orchestrator
         loader = OneBatchLoader((source, target))
@@ -311,7 +312,7 @@ class TestSyntheticWithOrchestrator:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         loader = OneBatchLoader((source, target))
 
@@ -364,7 +365,7 @@ class TestSyntheticRecoveryLarge:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         for _ in range(50):
             stepper.train_step(source, target)
@@ -400,7 +401,7 @@ class TestSyntheticRecoveryLarge:
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        stepper = PairRegistration(flow, code_source, data_term, composer, optimizer)
+        stepper = PairRegistration(flow, code_source, data_term, UnidirectionalMappingError(), composer, optimizer)
 
         for _ in range(50):
             stepper.train_step(source, target)

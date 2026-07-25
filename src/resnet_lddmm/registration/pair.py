@@ -2,23 +2,26 @@
 
 import torch
 from src.learning.losses.composer import LossComposer
+from src.resnet_lddmm.losses import BidirectionalMappingError
 
 
 class PairRegistration:
     """One-to-one shape registration with optional code regularisation.
 
-    Composes flow, code source, data term, and loss via LossComposer.
+    Uses a mapping error strategy (unidirectional or bidirectional) to compute
+    data and kinetic terms. Optionally includes code regularization and isometry loss.
     Implements both the training loop (train_step) and the four-method protocol
     (state_dict, load_state_dict, train, eval) for reused callbacks.
     """
 
-    def __init__(self, flow, code_source, data_term, composer, optimizer, iso_loss=None):
+    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None):
         """Initialize the registration stepper.
 
         Args:
             flow: NeuralODEFlow instance
             code_source: ShapeCode instance (e.g., NoCode or AutoDecoderCodes)
             data_term: DataTerm instance (e.g., CDData or L2Data)
+            mapping_error: MappingError strategy (UnidirectionalMappingError or BidirectionalMappingError)
             composer: LossComposer instance
             optimizer: torch optimizer instance
             iso_loss: IsometryLoss instance (optional, created by runner if enabled)
@@ -26,9 +29,12 @@ class PairRegistration:
         self.flow = flow
         self.code_source = code_source
         self.data_term = data_term
+        self.mapping_error = mapping_error
         self.composer = composer
         self.optimizer = optimizer
         self.iso_loss = iso_loss
+        self.is_bidirectional = isinstance(mapping_error, BidirectionalMappingError)
+        self.backward_traj = None  # Stored when bidirectional
 
     def _values(self, source, target):
         """Compute trajectory and per-term loss values.
@@ -38,22 +44,33 @@ class PairRegistration:
             target: batch-like with .points [B,M,3] and optionally .weights
 
         Returns:
-            (traj, values_dict) where values_dict has keys for data, kinetic, code_reg, isometry
+            (fwd_traj, values_dict) where values_dict has keys for data, kinetic, code_reg, isometry
         """
         code = self.code_source(source)
-        traj = self.flow(source.points, code)
+
+        # Use mapping error strategy (encapsulates direction logic)
+        data, kinetic = self.mapping_error(self.flow, self.data_term, source, target, code)
+
+        # Compute forward trajectory for isometry loss and return value
+        fwd_traj = self.flow(source.points, code)
+
+        # For bidirectional mode, also compute backward trajectory for export
+        if self.is_bidirectional:
+            self.backward_traj = self.flow.inverse(target.points, code)
+        else:
+            self.backward_traj = None
 
         values = {
-            "data": self.data_term(traj.end, target.points, tgt_w=target.weights),
-            "kinetic": traj.kinetic_energy(),
+            "data": data,
+            "kinetic": kinetic,
             "code_reg": self.code_source.penalty(),
         }
 
         # Add isometry loss if enabled
         if self.iso_loss is not None:
-            values["isometry"] = self.iso_loss(traj, self.flow.field)
+            values["isometry"] = self.iso_loss(fwd_traj, self.flow.field)
 
-        return traj, values
+        return fwd_traj, values
 
     def train_step(self, source, target):
         """One gradient step: forward, loss, backward, optimizer step.

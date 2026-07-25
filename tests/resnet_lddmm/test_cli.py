@@ -168,7 +168,7 @@ class TestPoCConfig:
 
         assert isinstance(cfg, ExperimentCfg)
         assert cfg.source == "data/hand/template.vtp"
-        assert cfg.target == "data/hand/template.vtp"
+        assert cfg.target == "data/hand/target_3.vtp"
 
     def test_poc_config_has_reasonable_defaults(self):
         """Verify PoC config uses reasonable hyperparameters."""

@@ -14,8 +14,6 @@ field:
 code:
   kind: none
 
-conditioning:
-  method: none
 
 loss:
   data_name: chamfer

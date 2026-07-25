@@ -4,7 +4,7 @@
 
 source: data/hand/template.vtp
 target: data/hand/target_3.vtp
-output_dir: ./outputs/hand_pair_poc_target_3_emd
+output_dir: ./outputs/hand_pair_poc_target_3_bidir
 
 # Field: velocity field (time_varying or stationary)
 # For stationary: use kind: stationary (same f(x) at all time steps; use num_steps for integration steps)
@@ -18,19 +18,17 @@ field:
 code:
   kind: none
 
-# Conditioning: how shape code enters the field (none | concat | film | position_aware)
-conditioning:
-  method: none
 
 # Loss: EMD (Earth Mover's Distance) for articulated shapes + kinetic energy
 loss:
-  data_name: emd
-  data_kwargs:
-    p: 2
-    blur: 0.01
-    backend: auto
-  sigma: 0.02
-  kinetic_weight: 5
+  data_name: chamfer
+  data_kwargs: {}
+    #p: 2
+   # blur: 0.01
+   # backend: auto
+  direction: bidirectional
+  sigma: 0.0002
+  kinetic_weight: 0.005
   code_reg_weight: 0.0
   isometry_weight: 0.0
   isometry_type: det

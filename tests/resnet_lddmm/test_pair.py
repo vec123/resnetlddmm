@@ -11,6 +11,7 @@ from src.resnet_lddmm.integrators import ForwardEuler
 from src.resnet_lddmm.fields.time_varying import TimeVaryingField
 from src.resnet_lddmm.codes.none import NoCode
 from src.resnet_lddmm.losses.data_terms import L2Data
+from src.resnet_lddmm.losses import UnidirectionalMappingError
 from src.learning.losses.composer import LossTerm, LossComposer
 
 
@@ -32,13 +33,14 @@ class TestPairRegistrationBasics:
         flow = NeuralODEFlow(field, ForwardEuler(), ForwardEuler(), num_steps=num_steps)
         code_source = NoCode()
         data_term = L2Data()
+        mapping_error = UnidirectionalMappingError()
         composer = LossComposer([
             LossTerm("data", weight=1.0),
             LossTerm("kinetic", weight=0.1),
             LossTerm("code_reg", weight=1.0),
         ])
         optimizer = torch.optim.Adam(flow.parameters(), lr=0.01)
-        return PairRegistration(flow, code_source, data_term, composer, optimizer)
+        return PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer)
 
     def test_initialization(self):
         """Verify PairRegistration can be instantiated."""

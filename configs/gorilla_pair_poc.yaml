@@ -18,10 +18,6 @@ field:
 code:
   kind: none
 
-# Conditioning: how shape code enters the field (none | concat | film | position_aware)
-conditioning:
-  method: none
-
 # Loss: EMD (Earth Mover's Distance) for articulated shapes + kinetic energy
 loss:
   data_name: chamfer
