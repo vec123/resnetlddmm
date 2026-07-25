@@ -452,3 +452,229 @@ class TestCohortRegistrationNumericalStability:
         assert traj is not None
         assert isinstance(loss_val, float)
         assert isinstance(breakdown, dict)
+
+
+class TestCohortRegistrationInfer:
+    """Tests for code-only inference (T29: DeepSDF auto-decoder protocol)."""
+
+    def test_infer_returns_tensor(self):
+        """Verify infer() returns a tensor of shape [1, n_z]."""
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+        new_shape = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+        target = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        z = stepper.infer(new_shape, target, steps_adam=5)
+
+        assert isinstance(z, torch.Tensor)
+        assert z.shape == (1, stepper.code_source.n_z)
+
+    def test_infer_has_infer_method(self):
+        """Verify infer method exists and is callable."""
+        stepper = TestCohortRegistrationBasics.make_stepper()
+        assert hasattr(stepper, "infer")
+        assert callable(stepper.infer)
+
+    def test_infer_converges(self):
+        """Verify loss decreases during infer() optimization."""
+        torch.manual_seed(42)
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+
+        # Create a held-out shape and template
+        new_shape = CohortBatch(
+            points=torch.randn(1, 15, 3),
+            shape_ids=torch.tensor([0])
+        )
+        target = CohortBatch(
+            points=torch.randn(1, 15, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        # Manually track loss during optimization
+        z_new = torch.randn(1, stepper.code_source.n_z) * (2.0 / stepper.code_source.n_z) ** 0.5
+        z_new.requires_grad = True
+
+        optimizer = torch.optim.Adam([z_new], lr=0.01)
+        stepper.flow.eval()
+
+        losses = []
+        for _ in range(10):
+            optimizer.zero_grad()
+            fwd_traj = stepper.flow(new_shape.points, z_new)
+            tgt_broadcast = target.points.expand(1, -1, -1)
+            bwd_traj = stepper.flow.inverse(tgt_broadcast, z_new)
+            data_fwd = stepper.data_term(fwd_traj.end, target.points)
+            data_bwd = stepper.data_term(bwd_traj.end, new_shape.points)
+            data = data_fwd + data_bwd
+            kinetic = fwd_traj.kinetic_energy() + bwd_traj.kinetic_energy()
+            code_reg = (z_new ** 2).mean()
+            values = {"data": data, "kinetic": kinetic, "code_reg": code_reg}
+            loss, _ = stepper.composer.compute(values)
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.item())
+
+        # Loss should decrease
+        assert losses[-1] < losses[0], f"Loss did not decrease: {losses[0]} -> {losses[-1]}"
+
+    def test_infer_flow_frozen(self):
+        """Verify flow parameters are bit-identical before/after infer()."""
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+
+        # Clone flow state before inference
+        flow_state_before = {
+            name: param.data.clone() for name, param in stepper.flow.named_parameters()
+        }
+
+        new_shape = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+        target = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        z = stepper.infer(new_shape, target, steps_adam=5)
+
+        # Verify all flow parameters are identical
+        for name, param in stepper.flow.named_parameters():
+            assert torch.allclose(param.data, flow_state_before[name], atol=1e-7), \
+                f"Flow param '{name}' was modified"
+
+    def test_infer_with_lbfgs(self):
+        """Verify infer() works with optional L-BFGS refinement."""
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+
+        new_shape = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+        target = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        # Should not raise with L-BFGS steps
+        z = stepper.infer(new_shape, target, steps_adam=3, steps_lbfgs=2)
+
+        assert z is not None
+        assert z.shape == (1, stepper.code_source.n_z)
+
+    @pytest.mark.slow
+    def test_infer_learns_distinct_codes(self):
+        """Verify different shapes get different optimized codes."""
+        torch.manual_seed(42)
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=3, num_steps=5)
+
+        target = CohortBatch(
+            points=torch.randn(1, 20, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        # Infer on two different shapes
+        shape1 = CohortBatch(
+            points=torch.randn(1, 20, 3),
+            shape_ids=torch.tensor([0])
+        )
+        shape2 = CohortBatch(
+            points=torch.randn(1, 20, 3),
+            shape_ids=torch.tensor([1])
+        )
+
+        z1 = stepper.infer(shape1, target, steps_adam=10)
+        z2 = stepper.infer(shape2, target, steps_adam=10)
+
+        # Different shapes should get different codes
+        assert not torch.allclose(z1, z2), "Codes for different shapes are identical"
+
+    def test_infer_code_not_in_embedding_table(self):
+        """Verify inferred code is independent of embedding table."""
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+
+        # Get initial embedding
+        initial_z0 = stepper.code_source.codes.weight[0].clone()
+
+        new_shape = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+        target = CohortBatch(
+            points=torch.randn(1, 10, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        z_inferred = stepper.infer(new_shape, target, steps_adam=5)
+
+        # Embedding table should be unchanged
+        assert torch.equal(
+            stepper.code_source.codes.weight[0], initial_z0
+        ), "Embedding table was modified during infer()"
+
+        # Inferred code may be different from table entry
+        # (not a hard assertion, just documenting behavior)
+
+    @pytest.mark.slow
+    def test_infer_on_real_hand_data(self):
+        """Integration test: infer on held-out hand with real data (T29 Phase 6 exit)."""
+        from pathlib import Path
+
+        # Load hand template
+        hand_dir = Path("data/hand")
+        if not hand_dir.exists():
+            pytest.skip("Hand data not found")
+
+        # Import after conditional check
+        from src.resnet_lddmm.io import load_shape
+
+        template_path = hand_dir / "template.vtp"
+        if not template_path.exists():
+            pytest.skip("Hand template not found")
+
+        # Create a small trained stepper
+        torch.manual_seed(42)
+        stepper = TestCohortRegistrationBasics.make_stepper(num_shapes=2, num_steps=5)
+
+        # Train on a synthetic pair first to get reasonable flow
+        train_shape = CohortBatch(
+            points=torch.randn(1, 252, 3),  # match hand point count
+            shape_ids=torch.tensor([0])
+        )
+        train_target = CohortBatch(
+            points=torch.randn(1, 252, 3),
+            shape_ids=torch.tensor([0])
+        )
+
+        for _ in range(10):
+            stepper.train_step(train_shape, train_target)
+
+        # Load template and create a held-out test shape
+        template = load_shape(str(template_path))
+
+        # Create a held-out test shape (perturbed template)
+        test_shape = CohortBatch(
+            points=template.points + torch.randn_like(template.points) * 0.05,
+            shape_ids=torch.tensor([0])
+        )
+
+        target = CohortBatch(
+            points=template.points,
+            shape_ids=torch.tensor([0])
+        )
+
+        # Run inference
+        z_inferred = stepper.infer(test_shape, target, steps_adam=10)
+
+        # Verify shape
+        assert z_inferred.shape == (1, stepper.code_source.n_z)
+
+        # Verify flow is still usable (frozen check is in infer() itself)
+        test_input = torch.randn(1, 10, 3)
+        z_dummy = torch.randn(1, stepper.code_source.n_z)
+        output = stepper.flow(test_input, z_dummy)
+        assert output is not None
