@@ -35,6 +35,8 @@ class LossCfg:
     isometry_type: str = "strain"  # or "det" / "orthogonal"
     isometry_samples: int = 64  # points per step for isometry (64 = ~5x speedup)
     iso_kwargs: dict = dataclass_field(default_factory=lambda: {"loss_type": "strain", "sample_points": 64})
+    subsample_M: int = 2000                 # adaptive subsample target size (T28); 0 = disabled
+    subsample_a: float = 0.15               # fraction of hard examples to keep (T28)
 
 @dataclass
 class TrainCfg:

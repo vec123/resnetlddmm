@@ -63,6 +63,8 @@ class CDData(DataTerm):
 
     Wraps the reused chamfer_loss with an all-ones mask, since our inputs
     have no padding. Symmetric and differentiable.
+
+    Supports both scalar loss and per-point losses (for adaptive subsampling in T28).
     """
 
     def forward(
@@ -72,6 +74,7 @@ class CDData(DataTerm):
         pred_w: Optional[Tensor] = None,
         tgt_w: Optional[Tensor] = None,
         normals: Optional[Tensor] = None,
+        per_point: bool = False,
     ) -> Tensor:
         """Compute Chamfer distance with all-ones mask.
 
@@ -79,15 +82,30 @@ class CDData(DataTerm):
             pred: [B, N, 3] predicted positions
             target: [B, M, 3] target positions
             pred_w, tgt_w, normals: ignored (kept for protocol compatibility)
+            per_point: if True, return per-point losses [B, M]; if False, return scalar
 
         Returns:
-            Scalar Chamfer loss
+            Scalar Chamfer loss if per_point=False, else per-point distances [B, M]
         """
         # Create all-ones mask for unpadded target cloud
         mask = torch.ones(
             target.shape[:2], dtype=torch.bool, device=target.device
         )
-        return chamfer_loss(pred, target, mask)
+
+        # Compute pairwise distances [B, N, M]
+        dist_sq = torch.cdist(pred, target, p=2).pow(2)
+        dist_sq = dist_sq.masked_fill(~mask.unsqueeze(1), 1e6)
+
+        if per_point:
+            # Return per-point losses from target to pred (term2 of Chamfer)
+            per_point_losses = dist_sq.min(dim=1)[0]  # [B, M]
+            return per_point_losses
+
+        # Standard scalar loss
+        term1 = dist_sq.min(dim=2)[0].mean()
+        dist_t_to_p = dist_sq.min(dim=1)[0]
+        term2 = (dist_t_to_p * mask).sum() / (mask.sum() + 1e-8)
+        return term1 + term2
 
 
 class L2Data(DataTerm):
@@ -96,6 +114,8 @@ class L2Data(DataTerm):
     Assumes points are in correspondence by index (e.g., template points
     matched to target points at the same position). Simpler than Chamfer
     but requires pre-established correspondence.
+
+    Supports both scalar loss and per-point losses (for adaptive subsampling in T28).
     """
 
     def forward(
@@ -105,6 +125,7 @@ class L2Data(DataTerm):
         pred_w: Optional[Tensor] = None,
         tgt_w: Optional[Tensor] = None,
         normals: Optional[Tensor] = None,
+        per_point: bool = False,
     ) -> Tensor:
         """Compute mean squared error between matched clouds.
 
@@ -112,11 +133,17 @@ class L2Data(DataTerm):
             pred: [B, N, 3] predicted positions
             target: [B, N, 3] target positions (same N as pred)
             pred_w, tgt_w, normals: ignored (kept for protocol compatibility)
+            per_point: if True, return per-point losses [B, N]; if False, return scalar
 
         Returns:
-            Scalar MSE loss
+            Scalar MSE loss if per_point=False, else per-point MSE [B, N]
         """
-        return (pred - target).pow(2).sum(-1).mean()
+        per_point_losses = (pred - target).pow(2).sum(-1)  # [B, N]
+
+        if per_point:
+            return per_point_losses
+
+        return per_point_losses.mean()
 
 
 class EMDData(DataTerm):
