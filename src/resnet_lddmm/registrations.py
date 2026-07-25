@@ -12,6 +12,10 @@ from src.learning.registry import Registry
 # STEPS T4: Conditioning ABC
 Registry.register("conditioning", "none", "src.resnet_lddmm.conditioning.base:NoConditioning")
 
+# STEPS T22: Concat + PositionAware conditioning
+Registry.register("conditioning", "concat", "src.resnet_lddmm.conditioning.film:ConcatConditioning")
+Registry.register("conditioning", "position_aware", "src.resnet_lddmm.conditioning.position_aware:PositionAware")
+
 # STEPS T6: VelocityField + TimeVaryingField + StationaryField
 Registry.register("field", "time_varying", "src.resnet_lddmm.fields.time_varying:TimeVaryingField")
 Registry.register("field", "stationary", "src.resnet_lddmm.fields.time_varying:StationaryField")
