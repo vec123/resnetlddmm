@@ -17,7 +17,7 @@ from src.resnet_lddmm.config import ExperimentCfg
 from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
 from src.resnet_lddmm.flow import NeuralODEFlow
-from src.resnet_lddmm.integrators import ForwardEuler
+from src.resnet_lddmm.integrators import ForwardEuler, ModifiedEuler
 from src.resnet_lddmm import registrations  #  Side effect: registers all component Load component registrations
 from src.learning.registry import Registry
 from src.learning.losses.composer import LossComposer, LossTerm
@@ -101,7 +101,7 @@ def build(cfg: ExperimentCfg):
         activation=cfg.field.activation
     )
     integrator_direct = ForwardEuler()
-    integrator_inverse = None  # T21 adds ModifiedEuler
+    integrator_inverse = ModifiedEuler() 
 
     # Build flow
     flow = NeuralODEFlow(
@@ -119,15 +119,7 @@ def build(cfg: ExperimentCfg):
         "data_term", cfg.loss.data_name,
         **cfg.loss.data_kwargs
     )
-
-    # Create isometry loss if enabled
-    iso_loss = None
-    if cfg.loss.isometry_weight > 0:
-        iso_kwargs = {"loss_type": cfg.loss.isometry_type}
-        # Add sample_points if specified in config
-        if hasattr(cfg.loss, "isometry_samples"):
-            iso_kwargs["sample_points"] = cfg.loss.isometry_samples
-        iso_loss = Registry.create("iso_loss", "isometry", **iso_kwargs)
+    iso_loss = Registry.create("iso_loss", "isometry", **cfg.loss.iso_kwargs)
 
     # Build loss composer
     # Data weight is 1/(2σ²) per D4 invariant

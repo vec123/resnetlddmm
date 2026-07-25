@@ -34,6 +34,7 @@ class LossCfg:
     isometry_weight: float = 0.0  # ← disabled by default
     isometry_type: str = "strain"  # or "det" / "orthogonal"
     isometry_samples: int = 64  # points per step for isometry (64 = ~5x speedup)
+    iso_kwargs: dict = dataclass_field(default_factory=lambda: {"loss_type": "strain", "sample_points": 64})
 
 @dataclass
 class TrainCfg:

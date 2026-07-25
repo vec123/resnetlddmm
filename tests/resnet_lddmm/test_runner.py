@@ -15,8 +15,8 @@ from src.resnet_lddmm.registration.pair import PairRegistration
 class TestRunnerBuild:
     """Tests for build(cfg) composition function."""
 
-    def test_build_returns_stepper_and_loader(self):
-        """Verify build returns (stepper, loader) tuple."""
+    def test_build_returns_stepper_loader_transform(self):
+        """Verify build returns (stepper, loader, transform) tuple."""
         cfg = ExperimentCfg(
             source="data/hand/template.vtp",
             target="data/hand/template.vtp",
@@ -27,10 +27,11 @@ class TestRunnerBuild:
             train=TrainCfg(steps=5, lr=0.001, seed=42),
         )
 
-        stepper, loader = build(cfg)
+        stepper, loader, transform = build(cfg)
 
         assert isinstance(stepper, PairRegistration)
         assert loader is not None
+        assert transform is not None
 
     def test_build_stepper_has_correct_components(self):
         """Verify stepper components match config."""
@@ -44,7 +45,7 @@ class TestRunnerBuild:
             train=TrainCfg(steps=5, lr=0.001, seed=42),
         )
 
-        stepper, _ = build(cfg)
+        stepper, _, _ = build(cfg)
 
         # Verify stepper has expected components
         assert stepper.flow is not None
@@ -65,7 +66,7 @@ class TestRunnerBuild:
             train=TrainCfg(steps=2, lr=0.001),
         )
 
-        stepper, _ = build(cfg)
+        stepper, _, _ = build(cfg)
 
         assert stepper.flow.num_steps == 5
 
@@ -132,7 +133,7 @@ class TestRunnerBuild:
                 train=TrainCfg(steps=2),
             )
 
-            stepper, _ = build(cfg)
+            stepper, _, _ = build(cfg)
             assert stepper.data_term is not None
 
             # Test with l2
@@ -146,7 +147,7 @@ class TestRunnerBuild:
                 train=TrainCfg(steps=2),
             )
 
-            stepper2, _ = build(cfg2)
+            stepper2, _, _ = build(cfg2)
             assert stepper2.data_term is not None
 
     def test_build_composer_weights(self):
@@ -162,17 +163,18 @@ class TestRunnerBuild:
                 train=TrainCfg(steps=2),
             )
 
-            stepper, _ = build(cfg)
+            stepper, _, _ = build(cfg)
 
             # Data weight should be 1/(2σ²) = 1/(2*0.04) = 12.5
             expected_data_weight = 1.0 / (2 * 0.2**2)
 
             # Verify composer has the terms with correct structure
             assert stepper.composer is not None
-            # Composer stores terms in self.terms
-            assert len(stepper.composer.terms) == 3
+            # Composer stores terms in self.terms (data, kinetic, code_reg, isometry)
+            assert len(stepper.composer.terms) == 4
             # Check term names
-            assert [name for name, _, _ in stepper.composer.terms] == ["data", "kinetic", "code_reg"]
+            term_names = [term.name for term in stepper.composer.terms]
+            assert term_names == ["data", "kinetic", "code_reg", "isometry"]
 
 
 class TestRunnerRun:
@@ -306,7 +308,7 @@ class TestRunnerEdgeCases:
                 train=TrainCfg(steps=2),
             )
 
-            stepper, loader = build(cfg)
+            stepper, loader, _ = build(cfg)
 
             # Loader should have the two shapes as a batch
             assert loader is not None
@@ -326,8 +328,8 @@ class TestRunnerEdgeCases:
             train=TrainCfg(steps=2, seed=i),
         )
 
-        stepper1, _ = build(cfg_template(42))
-        stepper2, _ = build(cfg_template(42))
+        stepper1, _, _ = build(cfg_template(42))
+        stepper2, _, _ = build(cfg_template(42))
 
         # With same seed, parameters should match
         params1 = list(stepper1.flow.parameters())
