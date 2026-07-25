@@ -28,5 +28,11 @@ Registry.register("data_term", "emd", "src.resnet_lddmm.losses.data_terms:EMDDat
 # STEPS T10: ShapeCode + NoCode
 Registry.register("code", "none", "src.resnet_lddmm.codes.none:NoCode")
 
+# STEPS T27: AutoDecoderCodes (per-shape latent codes)
+Registry.register("code", "auto_decoder", "src.resnet_lddmm.codes.auto_decoder:AutoDecoderCodes")
+
+# STEPS T31: EncoderCodes (amortised codes via equivariant encoder)
+Registry.register("code", "encoder", "src.resnet_lddmm.codes.encoder:EncoderCodes")
+
 # IsometryLoss (shape-preserving regularization)
 Registry.register("iso_loss", "isometry", "src.resnet_lddmm.losses.data_terms:IsometryLoss")
