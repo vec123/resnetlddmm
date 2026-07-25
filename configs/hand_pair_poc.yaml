@@ -4,14 +4,14 @@
 
 source: data/hand/template.vtp
 target: data/hand/target_3.vtp
-output_dir: ./outputs/hand_pair_poc_target_3_bidir
+output_dir: ./outputs/hand_pair_poc_target_3_bidir_iso
 
 # Field: velocity field (time_varying or stationary)
 # For stationary: use kind: stationary (same f(x) at all time steps; use num_steps for integration steps)
 field:
   kind: stationary
-  num_steps: 20
-  width: 512
+  num_steps: 10
+  width: 256
   activation: relu
 
 # Code: no additional shape code (registration only)
@@ -30,14 +30,14 @@ loss:
   sigma: 0.0002
   kinetic_weight: 0.005
   code_reg_weight: 0.0
-  isometry_weight: 0.0
+  isometry_weight: 10.0
   isometry_type: det
 
 # Training: 500 steps with Adam at lr=1e-4, seed for reproducibility
 train:
   mode: pair
-  steps: 3000
-  lr: 0.00001
+  steps: 3001
+  lr: 0.0001
   seed: 42
   log_every: 50
   save_every: 500

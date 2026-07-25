@@ -166,6 +166,48 @@ def joint_normalize(shapes, domain=(0, 1)):
     return normalized_shapes, transform
 
 
+def load_cohort(folder, template):
+    """Load a cohort of shapes from a folder and normalize jointly with template (STEPS T26).
+
+    Loads all .vtp files from a folder, assigns sequential shape_ids, and normalizes
+    the cohort jointly with a template using a single bounding box (one frame).
+
+    Args:
+        folder: path to folder containing .vtp files
+        template: Shape object or path to .vtp/.obj template file
+
+    Returns:
+        (cohort_shapes, template_norm, transform) where:
+        - cohort_shapes: list of (shape_id, Shape) tuples for each cohort member
+        - template_norm: normalized template Shape
+        - transform: FrameTransform used for joint normalization
+    """
+    # Load template if it's a path
+    if isinstance(template, str):
+        template = load_shape(template)
+
+    # Collect all .vtp files from cohort folder
+    cohort_filenames = sorted([f for f in os.listdir(folder) if f.lower().endswith('.vtp')])
+    if not cohort_filenames:
+        raise ValueError(f"No .vtp files found in {folder}")
+
+    cohort_shapes_unnorm = []
+    for fname in cohort_filenames:
+        fpath = os.path.join(folder, fname)
+        shape = load_shape(fpath)
+        cohort_shapes_unnorm.append(shape)
+
+    # Joint normalization: template + all cohort shapes in one frame
+    all_shapes = [template] + cohort_shapes_unnorm
+    normalized_all, transform = joint_normalize(all_shapes)
+
+    # Extract normalized template and cohort
+    template_norm = normalized_all[0]
+    cohort_shapes = [(i, normalized_all[i + 1]) for i in range(len(cohort_shapes_unnorm))]
+
+    return cohort_shapes, template_norm, transform
+
+
 def export_trajectory(traj, faces, transform, out_dir):
     """Export trajectory steps as VTP files in world coordinates (STEPS T15).
 

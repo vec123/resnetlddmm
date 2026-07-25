@@ -6,7 +6,7 @@ import os
 import tempfile
 import numpy as np
 
-from src.resnet_lddmm.io import Shape, load_shape, FrameTransform, joint_normalize, export_trajectory
+from src.resnet_lddmm.io import Shape, load_shape, FrameTransform, joint_normalize, export_trajectory, load_cohort
 from src.resnet_lddmm.trajectory import Trajectory
 from src.vtk.io import load_vtp
 from src.vtk.extract import extract_vtp_points_cells, extract_vtp_point_fields
@@ -475,3 +475,153 @@ class TestExportTrajectory:
 
             expected = velocities[0, 0, :, :].numpy()
             assert np.allclose(velocity_loaded, expected, atol=1e-6)
+
+
+class TestLoadCohort:
+    """Tests for load_cohort (STEPS T26)."""
+
+    def test_load_cohort_basic(self):
+        """Verify load_cohort loads shapes and returns proper structure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a simple cohort with 2 shapes
+            template = load_shape("data/hand/template.vtp")
+
+            # Copy template to cohort folder twice
+            import shutil
+            for i in range(2):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            cohort, template_norm, transform = load_cohort(tmpdir, template)
+
+            # Should load 2 shapes
+            assert len(cohort) == 2
+            assert isinstance(template_norm, Shape)
+            assert isinstance(transform, FrameTransform)
+
+    def test_load_cohort_assigns_shape_ids(self):
+        """Verify cohort shapes are assigned sequential shape_ids."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = load_shape("data/hand/template.vtp")
+
+            import shutil
+            for i in range(3):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            cohort, _, _ = load_cohort(tmpdir, template)
+
+            # Extract IDs
+            ids = [shape_id for shape_id, _ in cohort]
+
+            # Should have sequential IDs starting from 0
+            assert ids == [0, 1, 2]
+
+    def test_load_cohort_ids_stable(self):
+        """Verify shape_ids are stable across multiple loads."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = load_shape("data/hand/template.vtp")
+
+            import shutil
+            for i in range(3):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            # Load twice
+            cohort1, _, _ = load_cohort(tmpdir, template)
+            cohort2, _, _ = load_cohort(tmpdir, template)
+
+            ids1 = [shape_id for shape_id, _ in cohort1]
+            ids2 = [shape_id for shape_id, _ in cohort2]
+
+            # IDs should be identical
+            assert ids1 == ids2
+
+    def test_load_cohort_all_points_in_domain(self):
+        """Verify all cohort points are normalized to domain [0, 1]."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = load_shape("data/hand/template.vtp")
+
+            import shutil
+            for i in range(2):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            cohort, template_norm, _ = load_cohort(tmpdir, template)
+
+            # Template points should be in [0, 1]
+            assert (template_norm.points >= -1e-5).all()
+            assert (template_norm.points <= 1.0 + 1e-5).all()
+
+            # Cohort points should be in [0, 1]
+            for _, shape in cohort:
+                assert (shape.points >= -1e-5).all(), f"Min below domain: {shape.points.min()}"
+                assert (shape.points <= 1.0 + 1e-5).all(), f"Max above domain: {shape.points.max()}"
+
+    def test_load_cohort_joint_normalization(self):
+        """Verify cohort and template are normalized jointly (one frame)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Load a template
+            template = load_shape("data/hand/template.vtp")
+            template_unnorm_center = template.points.mean()
+
+            import shutil
+            for i in range(2):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            # Load cohort
+            cohort, template_norm, _ = load_cohort(tmpdir, template)
+
+            # All shapes (template and cohort) should be normalized jointly
+            # This means they should share the same center and scale
+            # A simple check: after normalization, all should be in [0, 1]
+            # and the relative center position should be preserved
+
+            # Since all shapes are identical (copies of template),
+            # they should have identical normalized coordinates
+            for _, cohort_shape in cohort:
+                assert torch.allclose(
+                    cohort_shape.points,
+                    template_norm.points,
+                    atol=1e-5
+                ), "Cohort shapes should match template after joint normalization"
+
+    def test_load_cohort_empty_folder_raises(self):
+        """Verify empty folder raises an error."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = load_shape("data/hand/template.vtp")
+
+            with pytest.raises(ValueError, match="No .vtp files found"):
+                load_cohort(tmpdir, template)
+
+    def test_load_cohort_with_template_path(self):
+        """Verify load_cohort works when template is a path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import shutil
+            for i in range(2):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            # Pass template as path string
+            cohort, template_norm, _ = load_cohort(tmpdir, "data/hand/template.vtp")
+
+            assert len(cohort) == 2
+            assert isinstance(template_norm, Shape)
+
+    def test_load_cohort_preserves_faces_and_attributes(self):
+        """Verify faces and optional attributes are preserved."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = load_shape("data/hand/template.vtp")
+
+            import shutil
+            for i in range(2):
+                shutil.copy("data/hand/template.vtp", os.path.join(tmpdir, f"shape_{i:03d}.vtp"))
+
+            cohort, template_norm, _ = load_cohort(tmpdir, template)
+
+            # Faces should be preserved
+            assert torch.equal(template_norm.faces, template.faces)
+
+            for _, cohort_shape in cohort:
+                assert torch.equal(cohort_shape.faces, template.faces)
+
+                # Weights and normals should be preserved (or remain None)
+                if template.weights is not None:
+                    assert torch.allclose(cohort_shape.weights, template.weights, atol=1e-5)
+                if template.normals is not None:
+                    assert torch.allclose(cohort_shape.normals, template.normals, atol=1e-5)
