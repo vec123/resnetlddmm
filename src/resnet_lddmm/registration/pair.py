@@ -12,7 +12,7 @@ class PairRegistration:
     (state_dict, load_state_dict, train, eval) for reused callbacks.
     """
 
-    def __init__(self, flow, code_source, data_term, composer, optimizer):
+    def __init__(self, flow, code_source, data_term, composer, optimizer, iso_loss=None):
         """Initialize the registration stepper.
 
         Args:
@@ -21,12 +21,14 @@ class PairRegistration:
             data_term: DataTerm instance (e.g., CDData or L2Data)
             composer: LossComposer instance
             optimizer: torch optimizer instance
+            iso_loss: IsometryLoss instance (optional, created by runner if enabled)
         """
         self.flow = flow
         self.code_source = code_source
         self.data_term = data_term
         self.composer = composer
         self.optimizer = optimizer
+        self.iso_loss = iso_loss
 
     def _values(self, source, target):
         """Compute trajectory and per-term loss values.
@@ -36,7 +38,7 @@ class PairRegistration:
             target: batch-like with .points [B,M,3] and optionally .weights
 
         Returns:
-            (traj, values_dict) where values_dict has keys for data, kinetic, code_reg
+            (traj, values_dict) where values_dict has keys for data, kinetic, code_reg, isometry
         """
         code = self.code_source(source)
         traj = self.flow(source.points, code)
@@ -46,6 +48,11 @@ class PairRegistration:
             "kinetic": traj.kinetic_energy(),
             "code_reg": self.code_source.penalty(),
         }
+
+        # Add isometry loss if enabled
+        if self.iso_loss is not None:
+            values["isometry"] = self.iso_loss(traj, self.flow.field)
+
         return traj, values
 
     def train_step(self, source, target):

@@ -7,6 +7,12 @@ def load_vtp(vtp_path):
     reader.Update()
     return reader.GetOutput()
 
+def load_obj(obj_path):
+    reader = vtk.vtkOBJReader()
+    reader.SetFileName(obj_path)
+    reader.Update()
+    return reader.GetOutput()
+
 def load_vtu(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"File not found: {filename}")

@@ -1,5 +1,6 @@
 """NeuralODEFlow: facade combining a velocity field with forward and inverse integrators."""
 
+from typing import Optional
 import torch.nn as nn
 from torch import Tensor
 
@@ -36,7 +37,7 @@ class NeuralODEFlow(nn.Module):
         self.inv = inverse
         self.num_steps = num_steps
 
-    def forward(self, q0: Tensor, code: Tensor | None = None) -> Trajectory:
+    def forward(self, q0: Tensor, code: Optional[Tensor] = None) -> Trajectory:
         """Integrate forward: initial → deformed.
 
         Args:
@@ -48,7 +49,7 @@ class NeuralODEFlow(nn.Module):
         """
         return self.direct.integrate(q0, self.field, code, self.num_steps)
 
-    def inverse(self, qT: Tensor, code: Tensor | None = None) -> Trajectory:
+    def inverse(self, qT: Tensor, code: Optional[Tensor] = None) -> Trajectory:
         """Integrate backward: deformed → initial.
 
         Args:

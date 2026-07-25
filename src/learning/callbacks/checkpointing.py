@@ -41,11 +41,17 @@ class CheckpointWriter(Callback):
         checkpoint_dir = os.path.join(ctx.log_dir, self.directory)
         os.makedirs(checkpoint_dir, exist_ok=True)
         path = os.path.join(checkpoint_dir, filename or f"step_{step}.pt")
-        torch.save({
-            "step": step,
-            "encoder": ctx.stepper.encoder.state_dict(),
-            "decoder": ctx.stepper.decoder.state_dict(),
-            "optimizer": ctx.stepper.optimizer.state_dict(),
-        }, path)
+
+        # Duck-typing: prefer new protocol (state_dict method) over legacy (encoder/decoder attrs)
+        if hasattr(ctx.stepper, "state_dict"):
+            state = ctx.stepper.state_dict()
+        else:
+            state = {
+                "encoder": ctx.stepper.encoder.state_dict(),
+                "decoder": ctx.stepper.decoder.state_dict(),
+                "optimizer": ctx.stepper.optimizer.state_dict(),
+            }
+
+        torch.save({"step": step, **state}, path)
         if self.verbose:
             print(f"  checkpoint -> {path}")

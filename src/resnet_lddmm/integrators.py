@@ -1,6 +1,7 @@
 """ODE integrators for neural flows."""
 
 import abc
+from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -17,7 +18,7 @@ class Integrator(abc.ABC):
         self,
         q0: Tensor,
         field: VelocityField,
-        code: Tensor | None,
+        code: Optional[Tensor],
         num_steps: int,
     ) -> Trajectory:
         """Integrate the velocity field from initial position.
@@ -43,7 +44,7 @@ class ForwardEuler(Integrator):
         self,
         q0: Tensor,
         field: VelocityField,
-        code: Tensor | None,
+        code: Optional[Tensor],
         num_steps: int,
     ) -> Trajectory:
         """Integrate field from q0 through num_steps forward Euler steps.

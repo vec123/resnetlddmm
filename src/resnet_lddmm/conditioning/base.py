@@ -1,6 +1,7 @@
 """Conditioning ABC: how a shape code enters a velocity field."""
 
 import abc
+from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -16,7 +17,7 @@ class Conditioning(nn.Module, abc.ABC):
     dim: int  # per-point feature dimension; 0 for NoConditioning
 
     @abc.abstractmethod
-    def forward(self, x: Tensor, code: Tensor | None) -> Tensor | None:
+    def forward(self, x: Tensor, code: Optional[Tensor]) -> Optional[Tensor]:
         """Map positions and code to per-point conditioning features.
 
         Args:
@@ -35,5 +36,5 @@ class NoConditioning(Conditioning):
         super().__init__()
         self.dim = 0
 
-    def forward(self, x: Tensor, code: Tensor | None) -> None:
+    def forward(self, x: Tensor, code: Optional[Tensor]) -> None:
         return None

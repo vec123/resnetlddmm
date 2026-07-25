@@ -1,6 +1,7 @@
 """VelocityField ABC: interface for flow network components."""
 
 import abc
+from typing import Optional
 import torch.nn as nn
 from torch import Tensor
 
@@ -13,7 +14,7 @@ class VelocityField(nn.Module, abc.ABC):
 
     @abc.abstractmethod
     def forward(
-        self, x: Tensor, step: int | None = None, code: Tensor | None = None
+        self, x: Tensor, step: Optional[int] = None, code: Optional[Tensor] = None
     ) -> Tensor:
         """Map positions and optional code to velocity.
 

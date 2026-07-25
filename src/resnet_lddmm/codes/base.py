@@ -1,6 +1,7 @@
 """Shape code abstractions for amortised vs per-shape inference."""
 
 import abc
+from typing import Optional
 import torch.nn as nn
 from torch import Tensor
 
@@ -14,7 +15,7 @@ class ShapeCode(nn.Module, abc.ABC):
     """
 
     @abc.abstractmethod
-    def forward(self, batch) -> Tensor | None:
+    def forward(self, batch) -> Optional[Tensor]:
         """Extract codes from batch.
 
         Args:
@@ -25,7 +26,7 @@ class ShapeCode(nn.Module, abc.ABC):
         """
 
     @abc.abstractmethod
-    def penalty(self) -> Tensor | None:
+    def penalty(self) -> Optional[Tensor]:
         """Compute code regularisation term (e.g., L2 on embeddings).
 
         Returns:

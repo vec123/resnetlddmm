@@ -1,0 +1,31 @@
+# Proof-of-concept: hand pair registration with isometry constraint
+# Same as hand_pair_poc but with isometry regularization enabled
+
+source: data/ultrasound/1-01.vtp
+target: data/ultrasound/1-02.vtp
+output_dir: ./outputs/ultrasound_poc
+
+field:
+  kind: stationary
+  num_steps: 10
+  width: 512
+  activation: relu
+
+code:
+  kind: none
+
+loss:
+  data_name: chamfer
+  sigma: 0.02
+  kinetic_weight: 5.0
+  code_reg_weight: 0.0
+  isometry_weight: 0.000
+  isometry_type: det
+
+train:
+  mode: pair
+  steps: 500
+  lr: 0.0001
+  seed: 42
+  log_every: 10
+  save_every: 50

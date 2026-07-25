@@ -34,8 +34,14 @@ class ValidationRunner(Callback):
     def _evaluate(self, ctx):
         """Run the pass with the models in eval mode; returns (metrics, batch, pred)."""
         stepper = ctx.stepper
-        stepper.encoder.eval()
-        stepper.decoder.eval()
+
+        # Duck-typing: prefer new protocol (eval method) over legacy (encoder/decoder attrs)
+        if hasattr(stepper, "eval"):
+            stepper.eval()
+        else:
+            stepper.encoder.eval()
+            stepper.decoder.eval()
+
         try:
             val_iter = iter(self.val_loader)
             losses = []
@@ -59,5 +65,8 @@ class ValidationRunner(Callback):
                             for name, (total, count) in term_totals.items()})
             return metrics, last_batch, last_pred
         finally:
-            stepper.encoder.train()
-            stepper.decoder.train()
+            if hasattr(stepper, "train"):
+                stepper.train()
+            else:
+                stepper.encoder.train()
+                stepper.decoder.train()

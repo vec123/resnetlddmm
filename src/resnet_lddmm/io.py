@@ -1,12 +1,13 @@
 """I/O for shapes and trajectories (STEPS T13+)."""
 
 from dataclasses import dataclass
+from typing import Optional
 import os
 
 import torch
 import numpy as np
 
-from src.vtk.io import load_vtp, save_vtp
+from src.vtk.io import load_vtp, load_obj, save_vtp
 from src.vtk.extract import extract_vtp_points_cells, extract_vtp_point_fields
 from src.vtk.create import create_polydata
 from src.vtk.fields import add_point_field
@@ -59,23 +60,32 @@ class Shape:
 
     points: torch.Tensor  # [1, N, 3]
     faces: torch.Tensor  # [F, 3]
-    weights: torch.Tensor | None = None  # [1, N] or None
-    normals: torch.Tensor | None = None  # [1, N, 3] or None
+    weights: Optional[torch.Tensor] = None  # [1, N] or None
+    normals: Optional[torch.Tensor] = None  # [1, N, 3] or None
 
 
 def load_shape(path):
-    """Load a shape from a VTP file.
+    """Load a shape from a VTP or OBJ file.
 
     Extracts points, faces, and optional point fields (area, normal).
     Missing fields return None (caller handles uniform fallback).
 
     Args:
-        path: path to .vtp file
+        path: path to .vtp or .obj file
 
     Returns:
         Shape with points [1,N,3], faces [F,3], weights/normals or None
     """
-    poly = load_vtp(path)
+    # Detect format by extension
+    _, ext = os.path.splitext(path.lower())
+
+    if ext == ".vtp":
+        poly = load_vtp(path)
+    elif ext == ".obj":
+        poly = load_obj(path)
+    else:
+        raise ValueError(f"Unsupported format: {ext}. Supported: .vtp, .obj")
+
     points_np, faces_np = extract_vtp_points_cells(poly)
     fields = extract_vtp_point_fields(poly, ["area", "normal"])
 

@@ -1,3 +1,4 @@
 *.md
 theory*
 diffeomorphic_registration
+outputs*

@@ -1,0 +1,42 @@
+# Proof-of-concept: hand pair registration (STEP T17)
+# Registers two copies of the hand template (same geometry, tests correctness)
+# Use as template: adjust source/target paths and output_dir for your data
+
+source: data/gorilla/T13.obj
+target: data/gorilla/T177.obj
+output_dir: ./outputs/gorilla_pair_poc_13_177
+
+# Field: velocity field (time_varying or stationary)
+# For stationary: use kind: stationary (same f(x) at all time steps; use num_steps for integration steps)
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 512
+  activation: relu
+
+# Code: no additional shape code (registration only)
+code:
+  kind: none
+
+# Loss: EMD (Earth Mover's Distance) for articulated shapes + kinetic energy
+loss:
+  data_name: chamfer
+  data_kwargs: {}
+ #  data_kwargs:
+  #   p: 2
+   #  blur: 0.01
+    # backend: auto
+  sigma: 0.00001
+  kinetic_weight: 0.00000001
+  code_reg_weight: 0.0
+  isometry_weight: 0.0
+  isometry_type: det
+
+# Training: 500 steps with Adam at lr=1e-4, seed for reproducibility
+train:
+  mode: pair
+  steps: 3001
+  lr: 0.0001
+  seed: 42
+  log_every: 50
+  save_every: 500

@@ -1,0 +1,42 @@
+# Proof-of-concept: hand pair registration (STEP T17)
+# Registers two copies of the hand template (same geometry, tests correctness)
+# Use as template: adjust source/target paths and output_dir for your data
+
+source: data/rabbit/T90.obj
+target: data/rabbit/T127.obj
+output_dir: ./outputs/rabbit_pair_poc_90_127
+
+# Field: time-varying velocity field with K=10 integration steps
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 256
+  activation: relu
+
+# Code: no additional shape code (registration only)
+code:
+  kind: none
+
+# Loss: Chamfer distance with kinetic energy regularization
+loss:
+ #data_name: chamfer
+  data_name: emd
+  data_kwargs:
+    p: 2
+    blur: 0.01
+    backend: auto
+  data_kwargs: {}
+  sigma: 0.1
+  kinetic_weight: 5
+  code_reg_weight: 0.0
+  isometry_weight: 0.0
+  isometry_type: det
+
+# Training: 500 steps with Adam at lr=1e-4, seed for reproducibility
+train:
+  mode: pair
+  steps: 5000
+  lr: 0.0001
+  seed: 42
+  log_every: 50
+  save_every: 500

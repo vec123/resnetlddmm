@@ -6,8 +6,8 @@ target: data/hand/target_3.vtp
 output_dir: ./outputs/hand_pair_poc_iso_111
 
 field:
-  kind: stationary
-  num_steps: 20
+  kind: time-varying
+  num_steps: 10
   width: 512
   activation: relu
 
@@ -15,17 +15,17 @@ code:
   kind: none
 
 loss:
-  data_name: emd
-  data_kwargs:
-    p: 1
-    blur: 0.01
-    backend: auto
-  sigma: 0.02
+  data_name: chamfer
+  data_kwargs: {}
+  #  p: 1
+  #  blur: 0.01
+  #  backend: auto
+  sigma: 10
   kinetic_weight: 0.000001
   code_reg_weight: 0.0
-  isometry_weight: 10
+  isometry_weight: 100
   isometry_type: det
-  isometry_samples: 64  # Sample 64 points per step for ~5x speedup
+  isometry_samples: 12  
 
 train:
   mode: pair
