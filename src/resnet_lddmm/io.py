@@ -1,6 +1,6 @@
-"""I/O for shapes and trajectories (STEPS T13+)."""
+"""I/O for shapes and trajectories (STEPS T13+, T32)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 import os
 
@@ -15,14 +15,19 @@ from src.vtk.fields import add_point_field
 
 @dataclass(frozen=True)
 class FrameTransform:
-    """Affine normalization transform: center and scale (STEPS T14).
+    """Affine normalization transform: center and scale (STEPS T14, T32).
 
     Applies the transformation: (x - center) / scale
     Inverts via: x * scale + center
+
+    Optional pose (T32): includes encoder-predicted rotation/translation.
+    When present, invert() applies: x * scale + center, then rotates and translates.
     """
 
     center: torch.Tensor  # [3]
     scale: torch.Tensor  # scalar or [1]
+    rotation: Optional[torch.Tensor] = None  # [3, 3] or [B, 3, 3] or None
+    translation: Optional[torch.Tensor] = None  # [3] or [B, 3] or None
 
     def apply(self, points):
         """Apply the transform: (points - center) / scale.
@@ -36,15 +41,28 @@ class FrameTransform:
         return (points - self.center) / self.scale
 
     def invert(self, points):
-        """Invert the transform: points * scale + center.
+        """Invert the transform: points * scale + center, then apply pose if available.
 
         Args:
-            points: [B, N, 3] or [N, 3]
+            points: [N, 3] or [B, N, 3]
+            rotation: [3, 3] or None (learned encoder pose)
+            translation: [3] or None (learned encoder pose)
 
         Returns:
-            Inverted points in the same shape
+            Inverted points (with learned pose applied if available)
         """
-        return points * self.scale + self.center
+        # First denormalize: x * scale + center
+        world_points = points * self.scale + self.center
+
+        # Then apply encoder-learned rotation and translation if available
+        if self.rotation is not None:
+            # Rotation: points @ R^T (works for any shape ending in 3)
+            world_points = torch.matmul(world_points, self.rotation.T)
+
+        if self.translation is not None:
+            world_points = world_points + self.translation
+
+        return world_points
 
 
 @dataclass

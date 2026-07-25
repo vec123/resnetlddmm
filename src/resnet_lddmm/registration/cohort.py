@@ -142,7 +142,7 @@ class CohortRegistration:
         self.code_source.eval()
 
     def infer(self, new_shape, target, steps_adam, steps_lbfgs=0):
-        """Optimize code for a new shape with frozen flow (STEPS T29).
+        """Optimize code for a new shape with frozen flow (STEPS T29, T32 semi-amortised init).
 
         Args:
             new_shape: Shape object with .points [1, N, 3] and optional weights/faces
@@ -154,9 +154,9 @@ class CohortRegistration:
             optimized_code: Tensor [1, n_z], the inferred code for the new shape
 
         This implements the DeepSDF auto-decoder test-time protocol: freeze Θ,
-        optimize only a fresh z initialized from N(0, 2/N_z·I). Cheap by
-        construction — the amortisation payoff. Asserts flow is bit-identical
-        before/after (frozen-decoder guarantee).
+        optimize only a fresh z. If code_source is EncoderCodes, initializes z from
+        encoder prediction (semi-amortised); otherwise initializes from N(0, 2/N_z·I).
+        Asserts flow is bit-identical before/after (frozen-decoder guarantee).
         """
         from src.learning.loader.loaders import CohortBatch
 
@@ -169,19 +169,33 @@ class CohortRegistration:
         for param in self.flow.parameters():
             param.requires_grad = False
 
-        # Initialize fresh code [1, n_z] ~ N(0, 2/n_z·I) (per paper)
+        # Initialize code: try encoder first (T32 semi-amortised), fall back to random
         n_z = self.code_source.n_z
         device = next(self.flow.parameters()).device
-        z_new = torch.randn(1, n_z, device=device) * (2.0 / n_z) ** 0.5
-        z_new.requires_grad = True
 
-        # Create batch for new shape
+        # Create batch for new shape (needed for encoder or baseline)
         source_batch = CohortBatch(
             points=new_shape.points.to(device),
             shape_ids=torch.tensor([0], dtype=torch.long, device=device),
             weights=new_shape.weights.to(device) if hasattr(new_shape, "weights") and new_shape.weights is not None else None,
             faces=[new_shape.faces] if hasattr(new_shape, "faces") and new_shape.faces is not None else [None],
         )
+
+        # Check if code_source is EncoderCodes and can provide amortised init
+        try:
+            from src.resnet_lddmm.codes.encoder import EncoderCodes
+            if isinstance(self.code_source, EncoderCodes):
+                # Use encoder to get initial code from new shape (semi-amortised)
+                z_init = self.code_source(source_batch)  # [1, n_z]
+            else:
+                # Fall back to random initialization
+                z_init = torch.randn(1, n_z, device=device) * (2.0 / n_z) ** 0.5
+        except (ImportError, AttributeError):
+            # EncoderCodes not available or different error; use random init
+            z_init = torch.randn(1, n_z, device=device) * (2.0 / n_z) ** 0.5
+
+        z_new = z_init.clone().detach()
+        z_new.requires_grad = True
 
         # Create target batch (single point)
         target_batch = CohortBatch(

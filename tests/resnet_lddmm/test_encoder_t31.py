@@ -81,6 +81,68 @@ class TestLazyImportGuarantee:
         assert encoder_target.endswith(":EncoderCodes")
 
 
+class TestPoseTransform:
+    """Tests for FrameTransform with optional rotation/translation (T32)."""
+
+    def test_frame_transform_without_pose(self):
+        """Verify FrameTransform works without pose (backward compatibility)."""
+        from src.resnet_lddmm.io import FrameTransform
+
+        center = torch.tensor([0.5, 0.5, 0.5])
+        scale = torch.tensor(1.0)
+        transform = FrameTransform(center=center, scale=scale)
+
+        # Normalized point
+        point_norm = torch.tensor([[0.0, 0.0, 0.0]])
+
+        # Invert: should give 0*1 + 0.5 = [0.5, 0.5, 0.5]
+        point_world = transform.invert(point_norm)
+        assert torch.allclose(point_world, torch.tensor([[0.5, 0.5, 0.5]]))
+
+    def test_frame_transform_with_pose(self):
+        """Verify FrameTransform applies rotation and translation correctly."""
+        from src.resnet_lddmm.io import FrameTransform
+
+        center = torch.tensor([0.0, 0.0, 0.0])
+        scale = torch.tensor(1.0)
+
+        # Identity rotation, translation [1, 0, 0]
+        rotation = torch.eye(3).unsqueeze(0)  # [1, 3, 3]
+        translation = torch.tensor([[1.0, 0.0, 0.0]])  # [1, 3]
+
+        transform = FrameTransform(center=center, scale=scale, rotation=rotation, translation=translation)
+
+        # Normalized point [0, 0, 0]
+        point_norm = torch.tensor([[0.0, 0.0, 0.0]])
+
+        # Invert: denormalize, then translate -> [1, 0, 0]
+        point_world = transform.invert(point_norm)
+        assert torch.allclose(point_world, torch.tensor([[1.0, 0.0, 0.0]]))
+
+    def test_frame_contract_with_learned_pose(self):
+        """Frame contract: pose is learned with flow to improve alignment (T32)."""
+        from src.resnet_lddmm.io import FrameTransform
+
+        # Canonical points in [0, 1]: output of flow
+        points_canonical = torch.tensor([[0.1, 0.2, 0.3], [0.5, 0.6, 0.7]], dtype=torch.float32)
+
+        # Encoder learns rotation and translation jointly with flow
+        # For this test: identity (no rotation) and small translation
+        rotation = torch.eye(3)
+        translation = torch.tensor([0.1, 0.0, 0.0])
+
+        center = torch.tensor([0.0, 0.0, 0.0])
+        scale = torch.tensor(1.0)
+        transform = FrameTransform(center=center, scale=scale, rotation=rotation, translation=translation)
+
+        # After invert (apply learned pose), shape is transformed
+        points_aligned = transform.invert(points_canonical)
+
+        # Expected: points + translation (since rotation is identity)
+        expected = points_canonical + translation
+        assert torch.allclose(points_aligned, expected, atol=1e-6)
+
+
 class TestEncoderCodesImportSkip:
     """Tests for EncoderCodes that require e3nn/torch_geometric.
 
@@ -176,6 +238,77 @@ class TestEncoderCodesImportSkip:
         assert codes._last is not None
         assert hasattr(codes._last, 'rotation')  # EncoderOutput field
         assert hasattr(codes._last, 'translation')  # EncoderOutput field
+
+    @pytest.mark.skipif(
+        not _deps_available(),
+        reason="e3nn, torch_geometric, or GroupEncoder not available"
+    )
+    def test_encoder_codes_get_pose(self):
+        """Verify EncoderCodes.get_pose() returns rotation/translation (T32)."""
+        from src.resnet_lddmm.codes.encoder import EncoderCodes
+        from src.learning.loader.loaders import CohortBatch
+        from tests.resnet_lddmm.test_encoder_t31 import MockGraphBuilder, MockEncoder
+
+        graph_builder = MockGraphBuilder()
+        encoder = MockEncoder(latent_dim=3)
+        codes = EncoderCodes(graph_builder=graph_builder, encoder=encoder)
+
+        batch = CohortBatch(
+            points=torch.randn(2, 8, 3),
+            shape_ids=torch.tensor([0, 1], dtype=torch.long),
+            weights=None,
+            faces=[None] * 2,
+        )
+
+        # Before forward, get_pose() should return None, None
+        rot, trans = codes.get_pose()
+        assert rot is None and trans is None
+
+        # After forward, get_pose() should return pose tensors
+        z = codes(batch)
+        rot, trans = codes.get_pose()
+        assert rot is not None
+        assert trans is not None
+        assert rot.shape == (2, 3, 3)
+        assert trans.shape == (2, 3)
+
+    @pytest.mark.skipif(
+        not _deps_available(),
+        reason="e3nn, torch_geometric, or GroupEncoder not available"
+    )
+    def test_encoder_codes_with_pose_transform(self):
+        """Verify EncoderCodes.with_pose_transform() folds pose into FrameTransform (T32)."""
+        from src.resnet_lddmm.codes.encoder import EncoderCodes
+        from src.resnet_lddmm.io import FrameTransform
+        from src.learning.loader.loaders import CohortBatch
+        from tests.resnet_lddmm.test_encoder_t31 import MockGraphBuilder, MockEncoder
+
+        graph_builder = MockGraphBuilder()
+        encoder = MockEncoder(latent_dim=3)
+        codes = EncoderCodes(graph_builder=graph_builder, encoder=encoder)
+
+        batch = CohortBatch(
+            points=torch.randn(2, 8, 3),
+            shape_ids=torch.tensor([0, 1], dtype=torch.long),
+            weights=None,
+            faces=[None] * 2,
+        )
+
+        # Forward to populate _last
+        z = codes(batch)
+
+        # Create base transform
+        base_transform = FrameTransform(
+            center=torch.tensor([0.5, 0.5, 0.5]),
+            scale=torch.tensor(1.0)
+        )
+
+        # with_pose_transform should fold encoder pose in
+        pose_transform = codes.with_pose_transform(base_transform)
+        assert pose_transform.rotation is not None
+        assert pose_transform.translation is not None
+        assert pose_transform.center.equal(base_transform.center)
+        assert pose_transform.scale.equal(base_transform.scale)
 
 
 # Mock classes for testing without full dependencies

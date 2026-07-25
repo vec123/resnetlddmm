@@ -112,3 +112,33 @@ class EncoderCodes(ShapeCode):
         """Set encoder to evaluation mode."""
         super().eval()
         self.encoder.eval()
+
+    def get_pose(self):
+        """Get encoder's last predicted pose (rotation, translation) for T32 pre-alignment.
+
+        Returns:
+            (rotation, translation) tuple where each is [B, ...] or None if no last output
+        """
+        if self._last is None:
+            return None, None
+        return self._last.rotation, self._last.translation
+
+    def with_pose_transform(self, base_transform):
+        """Create a pose-aware FrameTransform by folding encoder pose into base transform.
+
+        Args:
+            base_transform: FrameTransform with center/scale
+
+        Returns:
+            New FrameTransform with encoder's rotation/translation folded in, or base_transform if no pose
+        """
+        if self._last is None or (self._last.rotation is None and self._last.translation is None):
+            return base_transform
+
+        from src.resnet_lddmm.io import FrameTransform
+        return FrameTransform(
+            center=base_transform.center,
+            scale=base_transform.scale,
+            rotation=self._last.rotation,
+            translation=self._last.translation
+        )
