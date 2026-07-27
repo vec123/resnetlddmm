@@ -1,0 +1,42 @@
+# Ablation: Time-varying field, unconditioned (ResNet-LDDMM cell)
+# Matrix cell [time-varying, unconditioned]
+# Reference: IMPLEMENTATION_PLAN.md §1 Table
+
+source: data/rabbit/cohort
+target: data/rabbit/T90.obj
+output_dir: outputs/ablation_time_varying_unconditioned
+
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 512
+  activation: relu
+
+code:
+  kind: none
+
+loss:
+  data_name: chamfer
+  data_kwargs: {}
+  direction: bidirectional
+  sigma: 0.1
+  kinetic_weight: 1.0
+  code_reg_weight: 0.0
+  weight_decay: 0.0
+  isometry_weight: 0.0
+  isometry_type: strain
+  subsample_M: 2000
+  subsample_a: 0.15
+
+train:
+  mode: cohort
+  steps: 2000
+  batch: 4
+  subsample: 0
+  lr: 0.0001
+  seed: 42
+  log_every: 50
+  save_every: 500
+  val_every: 0
+  export_shapes: 2
+  export_strategy: sequential
