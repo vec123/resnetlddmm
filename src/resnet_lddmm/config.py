@@ -49,6 +49,8 @@ class TrainCfg:
     log_every: int = 50
     save_every: int = 500
     val_every: int = 0
+    export_shapes: int = 0                  # 0 = all shapes (pair: always 1, cohort: min(batch_size, cohort_size))
+    export_strategy: str = "sequential"     # sequential | random
 
 
 @dataclass

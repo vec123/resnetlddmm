@@ -162,10 +162,11 @@ class ResamplingGraphLoader:
 
 @dataclass
 class CohortBatch:
-    """Batch of shapes with points, shape_ids, and optional weights."""
+    """Batch of shapes with points, shape_ids, optional weights, and per-shape faces."""
     points: torch.Tensor
     shape_ids: torch.Tensor
     weights: torch.Tensor = None
+    faces: list = None  # List of [F, 3] face tensors, one per shape in batch
 
 
 class CohortBatchLoader:
@@ -211,12 +212,16 @@ class CohortBatchLoader:
             if selected_shapes[0].weights is not None:
                 weights = torch.stack([s.weights.squeeze(0) for s in selected_shapes], dim=0)
 
-            # Create target batch (template)
+            # Collect per-shape faces (one per shape in batch)
+            source_faces = [s.faces if hasattr(s, 'faces') else None for s in selected_shapes]
+
+            # Create target batch (template) with single faces object
             target_batch = CohortBatch(
                 points=self.template.points,  # [1, M, 3]
                 shape_ids=torch.tensor([0], dtype=torch.long),  # [1]
-                weights=self.template.weights
+                weights=self.template.weights,
+                faces=[self.template.faces if hasattr(self.template, 'faces') else None]
             )
 
-            source_batch = CohortBatch(points=points, shape_ids=shape_ids, weights=weights)
+            source_batch = CohortBatch(points=points, shape_ids=shape_ids, weights=weights, faces=source_faces)
             yield source_batch, target_batch

@@ -25,6 +25,11 @@ Registry.register("data_term", "chamfer", "src.resnet_lddmm.losses.data_terms:CD
 Registry.register("data_term", "l2", "src.resnet_lddmm.losses.data_terms:L2Data")
 Registry.register("data_term", "emd", "src.resnet_lddmm.losses.data_terms:EMDData")
 
+# STEPS T33: WeightedCD / PCD / NCD data terms
+Registry.register("data_term", "weighted_chamfer", "src.resnet_lddmm.losses.data_terms:WeightedCDData")
+Registry.register("data_term", "pcd", "src.resnet_lddmm.losses.data_terms:PCDData")
+Registry.register("data_term", "ncd", "src.resnet_lddmm.losses.data_terms:NCDData")
+
 # STEPS T10: ShapeCode + NoCode
 Registry.register("code", "none", "src.resnet_lddmm.codes.none:NoCode")
 

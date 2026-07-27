@@ -146,6 +146,197 @@ class L2Data(DataTerm):
         return per_point_losses.mean()
 
 
+class WeightedCDData(DataTerm):
+    """Weighted Chamfer distance using per-point target areas (T33).
+
+    Similar to CDData but weights the target→pred term by target point weights
+    (typically surface areas). Reduces to standard Chamfer with uniform weights.
+    """
+
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        pred_w: Optional[Tensor] = None,
+        tgt_w: Optional[Tensor] = None,
+        normals: Optional[Tensor] = None,
+        per_point: bool = False,
+    ) -> Tensor:
+        """Compute weighted Chamfer distance.
+
+        Args:
+            pred: [B, N, 3] predicted positions
+            target: [B, M, 3] target positions
+            pred_w: [B, N] weights for pred (ignored)
+            tgt_w: [B, M] per-point target weights (surface areas); uniform if None
+            normals: ignored (kept for protocol compatibility)
+            per_point: if True, return per-point losses [B, M]; if False, return scalar
+
+        Returns:
+            Scalar weighted Chamfer loss if per_point=False, else per-point losses [B, M]
+        """
+        B, N, D = pred.shape
+        B_tgt, M, D = target.shape
+
+        # Compute pairwise distances [B, N, M]
+        dist_sq = torch.cdist(pred, target, p=2).pow(2)
+
+        if per_point:
+            # Return per-point losses from target to pred, weighted by tgt_w
+            per_point_losses = dist_sq.min(dim=1)[0]  # [B, M]
+            if tgt_w is not None:
+                per_point_losses = per_point_losses * tgt_w
+            return per_point_losses
+
+        # Term 1: pred → target (unweighted, average nearest target distance)
+        term1 = dist_sq.min(dim=2)[0].mean()
+
+        # Term 2: target → pred (weighted by tgt_w if provided)
+        tgt_to_pred = dist_sq.min(dim=1)[0]  # [B, M]
+        if tgt_w is not None:
+            # Normalize weights to avoid changing overall scale
+            w_normalized = tgt_w / (tgt_w.mean(dim=1, keepdim=True) + 1e-8)
+            term2 = (tgt_to_pred * w_normalized).mean()
+        else:
+            term2 = tgt_to_pred.mean()
+
+        return term1 + term2
+
+
+class PCDData(DataTerm):
+    """Point Cloud Distance: symmetric Chamfer-like metric without explicit masking (T33).
+
+    Similar to CDData but computed more directly without mask operations.
+    Equivalent to CDData on unpadded point clouds.
+    """
+
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        pred_w: Optional[Tensor] = None,
+        tgt_w: Optional[Tensor] = None,
+        normals: Optional[Tensor] = None,
+        per_point: bool = False,
+    ) -> Tensor:
+        """Compute point cloud distance (symmetric).
+
+        Args:
+            pred: [B, N, 3] predicted point positions
+            target: [B, M, 3] target point positions
+            pred_w, tgt_w, normals: ignored (kept for protocol compatibility)
+            per_point: if True, return per-point losses [B, M]; if False, return scalar
+
+        Returns:
+            Scalar PCD loss if per_point=False, else per-point distances [B, M]
+        """
+        # Compute pairwise distances [B, N, M]
+        dist_sq = torch.cdist(pred, target, p=2).pow(2)
+
+        if per_point:
+            # Return per-point losses from target to pred
+            per_point_losses = dist_sq.min(dim=1)[0]  # [B, M]
+            return per_point_losses
+
+        # Symmetric: pred→target + target→pred
+        term1 = dist_sq.min(dim=2)[0].mean()
+        term2 = dist_sq.min(dim=1)[0].mean()
+        return term1 + term2
+
+
+class NCDData(DataTerm):
+    """Normal-aware Chamfer distance: penalizes surfaces with wrong orientation (T33).
+
+    Combines point-to-point distance with normal alignment penalty.
+    Encourages normals to be oriented away from the matching pred points.
+    """
+
+    def __init__(self, normal_weight: float = 1.0):
+        """Initialize NCD loss.
+
+        Args:
+            normal_weight: balance between geometric and normal penalties (default 1.0)
+        """
+        super().__init__()
+        self.normal_weight = normal_weight
+
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        pred_w: Optional[Tensor] = None,
+        tgt_w: Optional[Tensor] = None,
+        normals: Optional[Tensor] = None,
+        per_point: bool = False,
+    ) -> Tensor:
+        """Compute normal-aware Chamfer distance.
+
+        Args:
+            pred: [B, N, 3] predicted point positions
+            target: [B, M, 3] target point positions
+            pred_w, tgt_w: ignored
+            normals: [B, M, 3] target surface normals; if None, reduces to CDData
+            per_point: if True, return per-point losses [B, M]; if False, return scalar
+
+        Returns:
+            Scalar NCD loss if per_point=False, else per-point losses [B, M]
+        """
+        B, N, D = pred.shape
+        B_tgt, M, D = target.shape
+
+        # Compute pairwise distances [B, N, M]
+        dist_vec = pred.unsqueeze(2) - target.unsqueeze(1)  # [B, N, M, 3]
+        dist_sq = (dist_vec ** 2).sum(dim=3)  # [B, N, M]
+
+        # If no normals, fall back to standard Chamfer
+        if normals is None:
+            if per_point:
+                return dist_sq.min(dim=1)[0]
+            term1 = dist_sq.min(dim=2)[0].mean()
+            term2 = dist_sq.min(dim=1)[0].mean()
+            return term1 + term2
+
+        # Compute normal alignment penalty: penalizes normals pointing towards pred
+        # For each pred point, find nearest target and its normal
+        pred_to_tgt_indices = dist_sq.min(dim=2)[1]  # [B, N]
+        pred_to_tgt_dists = dist_sq.min(dim=2)[0]  # [B, N]
+
+        # For normal penalty, compute alignment with nearest target normal
+        normal_penalty = torch.tensor(0.0, dtype=pred.dtype, device=pred.device)
+
+        for b in range(B):
+            for n in range(N):
+                m_idx = pred_to_tgt_indices[b, n]
+                direction = dist_vec[b, n, m_idx]  # [3], points from target to pred
+                normal = normals[b, m_idx]  # [3], should point away from pred
+
+                # Normalize for stable dot product
+                dir_norm = torch.norm(direction) + 1e-8
+                normal_norm = torch.norm(normal) + 1e-8
+                direction_normalized = direction / dir_norm
+                normal_normalized = normal / normal_norm
+
+                # Penalty: max(0, direction · normal) penalizes when normal points towards pred
+                # We want normal to point AWAY from pred, so dot product should be negative
+                dot_product = torch.dot(direction_normalized, normal_normalized)
+                normal_penalty = normal_penalty + torch.clamp(dot_product, min=0.0)
+
+        normal_penalty = normal_penalty / (B * N) if B * N > 0 else normal_penalty
+
+        # Term 1: pred → target (point distance + normal penalty)
+        term1 = (pred_to_tgt_dists.mean() + self.normal_weight * normal_penalty)
+
+        # Term 2: target → pred (point distance only)
+        tgt_to_pred_dists = dist_sq.min(dim=1)[0]  # [B, M]
+        term2 = tgt_to_pred_dists.mean()
+
+        if per_point:
+            # Return per-point losses from target to pred (geometric only for per_point)
+            return tgt_to_pred_dists
+
+        return term1 + term2
+
+
 class EMDData(DataTerm):
     """Earth Mover's Distance via Sinkhorn's algorithm (geomloss).
 

@@ -183,7 +183,7 @@ def _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss):
     loader = CohortBatchLoader(cohort_norm, target_norm, batch_size=cfg.train.batch)
 
     # Registry.create: code source (must be AutoDecoderCodes for cohort)
-    code_source = Registry.create("code", cfg.code.kind, n_shapes=len(cohort_norm), n_z=cfg.code.n_z)
+    code_source = Registry.create("code", cfg.code.kind, num_shapes=len(cohort_norm), n_z=cfg.code.n_z)
 
     # Create optimizer with two param groups: flow with weight_decay, codes without
     optimizer = torch.optim.Adam([
@@ -246,9 +246,17 @@ def run(cfg: ExperimentCfg, callbacks=None):
         # Default callbacks: verbose logging, trajectory export, diagnostics
         log_every = getattr(cfg.train, 'log_every', 50)
         save_every = getattr(cfg.train, 'save_every', 100)
+        export_shapes = getattr(cfg.train, 'export_shapes', 0)
+        export_strategy = getattr(cfg.train, 'export_strategy', 'sequential')
+        # Seed rng for export strategy if seed is set
+        export_rng = None
+        if cfg.train.seed is not None:
+            export_rng = torch.Generator(device="cpu")
+            export_rng.manual_seed(cfg.train.seed)
         callbacks = [
             VerboseCallback(log_every=log_every),
-            TrajectoryExporter(every_n_steps=save_every),
+            TrajectoryExporter(every_n_steps=save_every, export_shapes=export_shapes,
+                             export_strategy=export_strategy, rng=export_rng),
             DiagnosticsCallback(every_n_steps=save_every),
         ]
 

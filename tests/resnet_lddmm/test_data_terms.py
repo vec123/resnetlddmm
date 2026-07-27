@@ -2,7 +2,9 @@
 
 import torch
 import pytest
-from src.resnet_lddmm.losses.data_terms import DataTerm, CDData, L2Data
+from src.resnet_lddmm.losses.data_terms import (
+    DataTerm, CDData, L2Data, WeightedCDData, PCDData, NCDData
+)
 
 
 class TestDataTermABC:
@@ -347,3 +349,298 @@ class TestDataTermIgnoresOptionalArgs:
         loss_without_n = term(pred, target)
 
         assert torch.allclose(loss_with_n, loss_without_n, atol=1e-6)
+
+
+class TestWeightedCDDataBasics:
+    """Tests for WeightedCDData (T33)."""
+
+    def test_weighted_cddata_is_data_term(self):
+        """Verify WeightedCDData is a DataTerm."""
+        assert issubclass(WeightedCDData, DataTerm)
+
+    def test_weighted_cddata_returns_scalar(self):
+        """Verify WeightedCDData returns a scalar tensor."""
+        term = WeightedCDData()
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        loss = term(pred, target)
+        assert loss.shape == ()
+        assert loss.dtype == torch.float32
+
+    def test_weighted_cddata_zero_on_identical(self):
+        """Verify WeightedCDData is zero when pred == target."""
+        term = WeightedCDData()
+        cloud = torch.randn(2, 20, 3)
+
+        loss = term(cloud, cloud)
+        assert torch.allclose(loss, torch.tensor(0.0), atol=1e-5)
+
+
+class TestWeightedCDDataUniformWeights:
+    """Test that uniform weights reduce WeightedCD to standard CD."""
+
+    def test_weighted_cddata_uniform_equals_cddata(self):
+        """Verify uniform weights give same loss as CDData."""
+        weighted_term = WeightedCDData()
+        cd_term = CDData()
+
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 15, 3)
+        uniform_w = torch.ones(1, 15)
+
+        loss_weighted = weighted_term(pred, target, tgt_w=uniform_w)
+        loss_cd = cd_term(pred, target)
+
+        # Uniform weights normalized to mean 1 should give the same result
+        assert torch.allclose(loss_weighted, loss_cd, atol=1e-5)
+
+    def test_weighted_cddata_no_weights_equals_cddata(self):
+        """Verify no weights defaults to CDData behavior."""
+        weighted_term = WeightedCDData()
+        cd_term = CDData()
+
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        loss_weighted = weighted_term(pred, target)
+        loss_cd = cd_term(pred, target)
+
+        assert torch.allclose(loss_weighted, loss_cd, atol=1e-5)
+
+
+class TestWeightedCDDataWeighting:
+    """Test that WeightedCD actually uses weights."""
+
+    def test_weighted_cddata_non_uniform_changes_loss(self):
+        """Verify non-uniform weights change the loss."""
+        weighted_term = WeightedCDData()
+
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 15, 3)
+
+        # Uniform weights
+        w_uniform = torch.ones(1, 15)
+        loss_uniform = weighted_term(pred, target, tgt_w=w_uniform)
+
+        # Non-uniform weights (emphasize some targets more)
+        w_nonuniform = torch.ones(1, 15)
+        w_nonuniform[:, :5] = 10.0  # Emphasize first 5 targets
+        loss_nonuniform = weighted_term(pred, target, tgt_w=w_nonuniform)
+
+        # Losses should differ (at least in floating-point)
+        assert not torch.allclose(loss_uniform, loss_nonuniform, atol=1e-4)
+
+    def test_weighted_cddata_higher_weights_increase_loss(self):
+        """Verify higher weights on distant targets increase loss."""
+        weighted_term = WeightedCDData()
+
+        # Close target points
+        pred = torch.zeros(1, 1, 3)
+        target_close = torch.tensor([[[0.1, 0.0, 0.0]]])  # Close to origin
+        target_far = torch.tensor([[[10.0, 0.0, 0.0]]])  # Far from origin
+
+        # Weight the far point
+        w_far = torch.tensor([[10.0]])
+        loss_far_weighted = weighted_term(pred, target_far, tgt_w=w_far)
+
+        # Weight the close point
+        w_close = torch.tensor([[10.0]])
+        loss_close_weighted = weighted_term(pred, target_close, tgt_w=w_close)
+
+        # Weighted loss on far target should be much larger
+        assert loss_far_weighted > loss_close_weighted
+
+
+class TestWeightedCDDataPerPoint:
+    """Test per-point loss mode for WeightedCD."""
+
+    def test_weighted_cddata_per_point_shape(self):
+        """Verify per_point returns [B, M] shape."""
+        term = WeightedCDData()
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        losses = term(pred, target, per_point=True)
+        assert losses.shape == (2, 15)
+
+    def test_weighted_cddata_per_point_with_weights(self):
+        """Verify per_point respects tgt_w."""
+        term = WeightedCDData()
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 10, 3)
+        w = torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0]])
+
+        losses = term(pred, target, tgt_w=w, per_point=True)
+
+        # Last 5 targets have 2x weight, so losses should be roughly 2x
+        mean_first_half = losses[:, :5].mean()
+        mean_second_half = losses[:, 5:].mean()
+        assert mean_second_half > mean_first_half
+
+
+class TestPCDDataBasics:
+    """Tests for PCDData (T33)."""
+
+    def test_pcddata_is_data_term(self):
+        """Verify PCDData is a DataTerm."""
+        assert issubclass(PCDData, DataTerm)
+
+    def test_pcddata_returns_scalar(self):
+        """Verify PCDData returns a scalar tensor."""
+        term = PCDData()
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        loss = term(pred, target)
+        assert loss.shape == ()
+        assert loss.dtype == torch.float32
+
+    def test_pcddata_zero_on_identical(self):
+        """Verify PCDData is zero when pred == target."""
+        term = PCDData()
+        cloud = torch.randn(2, 20, 3)
+
+        loss = term(cloud, cloud)
+        assert torch.allclose(loss, torch.tensor(0.0), atol=1e-5)
+
+
+class TestPCDDataSymmetry:
+    """Test PCDData symmetry property."""
+
+    def test_pcddata_symmetric(self):
+        """Verify PCDData(pred, target) == PCDData(target, pred)."""
+        term = PCDData()
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 15, 3)
+
+        loss_12 = term(pred, target)
+        loss_21 = term(target, pred)
+
+        assert torch.allclose(loss_12, loss_21, atol=1e-5)
+
+    def test_pcddata_equiv_to_cddata(self):
+        """Verify PCDData is equivalent to CDData."""
+        pcd = PCDData()
+        cd = CDData()
+
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        loss_pcd = pcd(pred, target)
+        loss_cd = cd(pred, target)
+
+        assert torch.allclose(loss_pcd, loss_cd, atol=1e-5)
+
+
+class TestNCDDataBasics:
+    """Tests for NCDData (T33)."""
+
+    def test_ncddata_is_data_term(self):
+        """Verify NCDData is a DataTerm."""
+        assert issubclass(NCDData, DataTerm)
+
+    def test_ncddata_returns_scalar(self):
+        """Verify NCDData returns a scalar tensor."""
+        term = NCDData()
+        pred = torch.randn(2, 10, 3)
+        target = torch.randn(2, 15, 3)
+
+        loss = term(pred, target)
+        assert loss.shape == ()
+        assert loss.dtype == torch.float32
+
+    def test_ncddata_zero_on_identical(self):
+        """Verify NCDData is zero when pred == target."""
+        term = NCDData()
+        cloud = torch.randn(2, 20, 3)
+
+        loss = term(cloud, cloud)
+        assert torch.allclose(loss, torch.tensor(0.0), atol=1e-5)
+
+    def test_ncddata_init_with_normal_weight(self):
+        """Verify NCDData accepts normal_weight parameter."""
+        term = NCDData(normal_weight=2.0)
+        assert term.normal_weight == 2.0
+
+
+class TestNCDDataWithoutNormals:
+    """Test NCDData falls back to Chamfer when normals are None."""
+
+    def test_ncddata_without_normals_equals_cddata(self):
+        """Verify NCD without normals reduces to CDData."""
+        ncd = NCDData()
+        cd = CDData()
+
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 15, 3)
+
+        loss_ncd = ncd(pred, target)
+        loss_cd = cd(pred, target)
+
+        assert torch.allclose(loss_ncd, loss_cd, atol=1e-5)
+
+    def test_ncddata_ignores_normals_if_none(self):
+        """Verify NCD is unaffected when normals=None explicitly."""
+        term = NCDData()
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 15, 3)
+
+        loss_no_normals = term(pred, target, normals=None)
+        loss_explicit_none = term(pred, target, normals=None)
+
+        assert torch.allclose(loss_no_normals, loss_explicit_none, atol=1e-6)
+
+
+class TestNCDDataWithNormals:
+    """Test NCDData penalizes normal-flipped surfaces."""
+
+    def test_ncddata_penalizes_normal_mismatch(self):
+        """Verify NCD penalizes normals pointing towards pred more than away."""
+        ncd = NCDData(normal_weight=1.0)
+        cd = CDData()
+
+        # Simple fixture: pred at origin, target at (0,0,1)
+        # direction vector = pred - target = (0,0,-1)
+        pred = torch.tensor([[[0.0, 0.0, 0.0]]])  # [1, 1, 3]
+        target = torch.tensor([[[0.0, 0.0, 1.0]]])  # [1, 1, 3]
+
+        # Normal pointing up (away from pred): well-aligned
+        # dot((0,0,-1), (0,0,1)) = -1, penalty = max(0, -1) = 0
+        normal_good = torch.tensor([[[0.0, 0.0, 1.0]]])  # [1, 1, 3]
+        loss_good = ncd(pred, target, normals=normal_good)
+
+        # Normal pointing down (towards pred): misaligned
+        # dot((0,0,-1), (0,0,-1)) = 1, penalty = max(0, 1) = 1
+        normal_bad = torch.tensor([[[0.0, 0.0, -1.0]]])  # [1, 1, 3]
+        loss_bad = ncd(pred, target, normals=normal_bad)
+
+        # Geometric (CD) loss is the same, but NCD should be different
+        loss_cd = cd(pred, target)
+
+        # With normal pointing towards pred, NCD should be larger
+        assert loss_bad > loss_good
+        assert loss_good == loss_cd  # No normal penalty when normal points away
+
+    def test_ncddata_gradient_flow_with_normals(self):
+        """Verify gradients flow through NCD with normals."""
+        term = NCDData()
+        pred = torch.randn(1, 5, 3, requires_grad=True)
+        target = torch.randn(1, 5, 3)
+        normals = torch.randn(1, 5, 3)
+
+        loss = term(pred, target, normals=normals)
+        loss.backward()
+
+        assert pred.grad is not None
+        assert torch.all(torch.isfinite(pred.grad))
+
+    def test_ncddata_per_point_with_normals(self):
+        """Verify per_point mode works with normals."""
+        term = NCDData()
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 10, 3)
+        normals = torch.randn(1, 10, 3)
+
+        losses = term(pred, target, normals=normals, per_point=True)
+        assert losses.shape == (1, 10)

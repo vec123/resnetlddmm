@@ -12,11 +12,15 @@ class TrajectoryExporter(Callback):
 
     Calls io.export_trajectory() at its cadence to save deformed shapes
     at each integration step, with velocity fields attached.
+    Supports selective export in cohort mode via export_shapes and export_strategy.
     """
 
-    def __init__(self, every_n_steps=100):
+    def __init__(self, every_n_steps=100, export_shapes=0, export_strategy="sequential", rng=None):
         super().__init__(every_n_steps)
         self.transform = None  # Set by runner after build()
+        self.export_shapes = export_shapes  # 0 = all shapes
+        self.export_strategy = export_strategy  # sequential | random
+        self.rng = rng  # torch.Generator for random selection
 
     def on_step_end(self, ctx, step, metrics, batch, pred):
         """Export trajectory if due."""
@@ -31,14 +35,10 @@ class TrajectoryExporter(Callback):
         # pred is a Trajectory object (from stepper.train_step return)
         traj = pred
 
-        # Get batch geometry for faces
+        # Get batch geometry for faces (optional—point clouds work without faces)
         source, target = batch
-        source_faces = source.faces if hasattr(source, "faces") else None
-        target_faces = target.faces if hasattr(target, "faces") else None
-
-        if source_faces is None:
-            print(f"[TrajectoryExporter] Step {step}: no source faces, skipping")
-            return
+        source_faces = source.faces if hasattr(source, "faces") and source.faces is not None else None
+        target_faces = target.faces if hasattr(target, "faces") and target.faces is not None else None
 
         # Use actual transform from runner, or identity if not set
         if self.transform is None:
@@ -50,22 +50,53 @@ class TrajectoryExporter(Callback):
         base_out_dir = f"{ctx.log_dir}/trajectories/step_{step}"
 
         try:
-            # Export forward trajectory
-            fwd_dir = f"{base_out_dir}/forward"
-            print(f"[TrajectoryExporter] Exporting forward trajectory to {fwd_dir}")
-            export_trajectory(traj, source_faces, transform, fwd_dir)
-            print(f"[TrajectoryExporter] Successfully exported forward trajectory")
+            # Extract number of shapes in batch (B dimension)
+            num_shapes = traj.points.shape[1]
+
+            # Determine which shapes to export
+            if self.export_shapes == 0:
+                # Export all shapes
+                shape_indices = list(range(num_shapes))
+            else:
+                # Export subset
+                num_to_export = min(self.export_shapes, num_shapes)
+                if self.export_strategy == "random":
+                    shape_indices = torch.randperm(num_shapes, generator=self.rng)[:num_to_export].tolist()
+                else:  # sequential
+                    shape_indices = list(range(num_to_export))
+
+            # Export forward trajectory for selected shapes
+            for shape_idx in shape_indices:
+                # Slice trajectory to single shape: [K+1, 1, N, 3]
+                traj_slice = type(traj)(
+                    points=traj.points[:, shape_idx:shape_idx+1, :, :],
+                    velocities=traj.velocities[:, shape_idx:shape_idx+1, :, :],
+                    dt=traj.dt
+                )
+                # Get faces for this shape (source_faces is a list)
+                shape_faces = source_faces[shape_idx] if (isinstance(source_faces, list) and shape_idx < len(source_faces)) else source_faces
+                fwd_dir = f"{base_out_dir}/forward/shape_{shape_idx}"
+                print(f"[TrajectoryExporter] Exporting forward trajectory (shape {shape_idx}) to {fwd_dir}")
+                export_trajectory(traj_slice, shape_faces, transform, fwd_dir)
+            print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} forward trajectories")
 
             # Export backward trajectory if bidirectional mode
             stepper = ctx.stepper
             if hasattr(stepper, "backward_traj") and stepper.backward_traj is not None:
-                bwd_dir = f"{base_out_dir}/backward"
-                print(f"[TrajectoryExporter] Exporting backward trajectory to {bwd_dir}")
-                if target_faces is not None:
-                    export_trajectory(stepper.backward_traj, target_faces, transform, bwd_dir)
-                else:
-                    export_trajectory(stepper.backward_traj, source_faces, transform, bwd_dir)
-                print(f"[TrajectoryExporter] Successfully exported backward trajectory")
+                bwd_traj = stepper.backward_traj
+                for shape_idx in shape_indices:
+                    # Slice backward trajectory: [K+1, 1, N, 3]
+                    bwd_traj_slice = type(bwd_traj)(
+                        points=bwd_traj.points[:, shape_idx:shape_idx+1, :, :],
+                        velocities=bwd_traj.velocities[:, shape_idx:shape_idx+1, :, :],
+                        dt=bwd_traj.dt
+                    )
+                    # Get target faces (target_faces is a list with one element)
+                    tgt_faces = target_faces[0] if (isinstance(target_faces, list) and len(target_faces) > 0) else target_faces
+                    bwd_dir = f"{base_out_dir}/backward/shape_{shape_idx}"
+                    print(f"[TrajectoryExporter] Exporting backward trajectory (shape {shape_idx}) to {bwd_dir}")
+                    export_trajectory(bwd_traj_slice, tgt_faces, transform, bwd_dir)
+                print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} backward trajectories")
         except Exception as e:
             print(f"[TrajectoryExporter] Export failed: {e}")
             import traceback
