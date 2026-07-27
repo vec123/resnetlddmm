@@ -51,12 +51,12 @@ class PairRegistration:
         # Use mapping error strategy (encapsulates direction logic)
         data, kinetic = self.mapping_error(self.flow, self.data_term, source, target, code)
 
-        # Compute forward trajectory for isometry loss and return value
-        fwd_traj = self.flow(source.points, code)
+        # Use trajectory computed by mapping_error (avoids double computation with subsampling)
+        fwd_traj = self.mapping_error.last_fwd_traj
 
-        # For bidirectional mode, also compute backward trajectory for export
+        # For bidirectional mode, use backward trajectory from mapping_error
         if self.is_bidirectional:
-            self.backward_traj = self.flow.inverse(target.points, code)
+            self.backward_traj = self.mapping_error.last_bwd_traj
         else:
             self.backward_traj = None
 

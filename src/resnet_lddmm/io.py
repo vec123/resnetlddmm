@@ -226,15 +226,65 @@ def load_cohort(folder, template):
     return cohort_shapes, template_norm, transform
 
 
+def export_reference_shapes(source, target, transform, out_dir):
+    """Export source and target reference shapes as VTP files.
+
+    Saves source.vtp and target.vtp in the output directory for visualization
+    alongside trajectories. Shapes are denormalized to world coordinates.
+
+    Args:
+        source: Shape object with points [1, N, 3]
+        target: Shape object with points [1, M, 3]
+        transform: FrameTransform used for normalization (inverted to denormalize)
+        out_dir: directory to save source.vtp and target.vtp files
+    """
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Denormalize source points
+    source_points_norm = source.points[0, :, :]  # [N, 3]
+    source_points_world = transform.invert(source_points_norm)  # [N, 3]
+
+    # Validate source points
+    if torch.isnan(source_points_world).any() or torch.isinf(source_points_world).any():
+        print(f"[WARNING] Source points contain NaN/Inf, replacing with zeros")
+        source_points_world = torch.where(torch.isnan(source_points_world) | torch.isinf(source_points_world),
+                                          torch.tensor(0.0, device=source_points_world.device), source_points_world)
+
+    # Create and save source PolyData (point cloud, no faces)
+    source_polydata = create_polydata(source_points_world, faces=None)
+    source_path = os.path.join(out_dir, "source.vtp")
+    save_vtp(source_polydata, source_path, binary=True)
+
+    # Denormalize target points
+    target_points_norm = target.points[0, :, :]  # [M, 3]
+    target_points_world = transform.invert(target_points_norm)  # [M, 3]
+
+    # Validate target points
+    if torch.isnan(target_points_world).any() or torch.isinf(target_points_world).any():
+        print(f"[WARNING] Target points contain NaN/Inf, replacing with zeros")
+        target_points_world = torch.where(torch.isnan(target_points_world) | torch.isinf(target_points_world),
+                                          torch.tensor(0.0, device=target_points_world.device), target_points_world)
+
+    # Create and save target PolyData (point cloud, no faces)
+    target_polydata = create_polydata(target_points_world, faces=None)
+    target_path = os.path.join(out_dir, "target.vtp")
+    save_vtp(target_polydata, target_path, binary=True)
+
+    print(f"[io.export_reference_shapes] Exported source ({source_points_world.shape[0]} points) and target ({target_points_world.shape[0]} points)")
+
+
 def export_trajectory(traj, faces, transform, out_dir):
     """Export trajectory steps as VTP files in world coordinates (STEPS T15).
 
     Saves one VTP file per integration step with velocity as a point field.
     Points are denormalized from normalized domain back to world coordinates.
 
+    When subsampling is used, faces are not exported (point cloud only) since face
+    indices would be invalid for subsampled points.
+
     Args:
         traj: Trajectory object with points [K+1, B, N, 3] and velocities [K, B, N, 3]
-        faces: [F, 3] face indices carried to all steps
+        faces: [F, 3] face indices carried to all steps (ignored if subsampled)
         transform: FrameTransform used for normalization (inverted to denormalize)
         out_dir: directory to save step_XXXX.vtp files
 
@@ -255,14 +305,26 @@ def export_trajectory(traj, faces, transform, out_dir):
         # Denormalize to world coordinates
         points_world = transform.invert(points_norm)  # [N, 3]
 
-        # Create PolyData with points and faces
-        polydata = create_polydata(points_world, faces)
+        # Validate points (NaN/Inf crash ParaView)
+        if torch.isnan(points_world).any() or torch.isinf(points_world).any():
+            print(f"[WARNING] Step {step}: points contain NaN/Inf, replacing with zeros")
+            points_world = torch.where(torch.isnan(points_world) | torch.isinf(points_world),
+                                       torch.tensor(0.0, device=points_world.device), points_world)
+
+        # Create PolyData without faces (subsampled trajectories have invalid face indices)
+        polydata = create_polydata(points_world, faces=None)
 
         # Add velocity as point field (zero for step 0, actual velocity for steps 1..K)
         if step == 0:
             velocity = torch.zeros(N, 3, dtype=torch.float32)
         else:
             velocity = traj.velocities[step - 1, 0, :, :]  # [N, 3]
+
+        # Validate velocity
+        if torch.isnan(velocity).any() or torch.isinf(velocity).any():
+            print(f"[WARNING] Step {step}: velocity contains NaN/Inf, replacing with zeros")
+            velocity = torch.where(torch.isnan(velocity) | torch.isinf(velocity),
+                                  torch.tensor(0.0, device=velocity.device), velocity)
 
         polydata = add_point_field(polydata, velocity, field_name="velocity")
 

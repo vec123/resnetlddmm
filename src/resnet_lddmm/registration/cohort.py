@@ -53,15 +53,12 @@ class CohortRegistration:
         # Use mapping error strategy (encapsulates bidirectional logic)
         data, kinetic = self.mapping_error(self.flow, self.data_term, source_batch, target, code)
 
-        # Compute forward trajectory for isometry loss
-        fwd_traj = self.flow(source_batch.points, code)
+        # Use trajectory computed by mapping_error (avoids double computation with subsampling)
+        fwd_traj = self.mapping_error.last_fwd_traj
 
-        # For bidirectional mode, also compute backward trajectory for export
+        # For bidirectional mode, use backward trajectory from mapping_error
         if self.is_bidirectional:
-            # Broadcast target to match batch size: [1, M, 3] -> [B, M, 3]
-            B = source_batch.points.shape[0]
-            target_points_broadcast = target.points.expand(B, -1, -1)
-            self.backward_traj = self.flow.inverse(target_points_broadcast, code)
+            self.backward_traj = self.mapping_error.last_bwd_traj
         else:
             self.backward_traj = None
 

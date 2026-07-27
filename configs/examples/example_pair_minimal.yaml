@@ -1,0 +1,176 @@
+# Example: Pair Mode (Minimal Configuration)
+#
+# Trains a single deformation mapping from source to target shape.
+# Time-varying field (per-step blocks) + no learned codes (unconditioned).
+
+# ===== REQUIRED =====
+source: path/to/source.obj
+target: path/to/target.obj
+output_dir: outputs/example_pair_minimal
+
+# ===== FIELD (Velocity Field) =====
+field:
+  # Options: "time_varying" | "stationary"
+  # - time_varying: L separate blocks (one per Euler step), selected by step index
+  # - stationary: single backbone reused K times
+  kind: time_varying
+
+  # Number of ODE integration steps (K in Euler: q_{k+1} = q_k + (1/K)·v_k)
+  # Configured ONCE here, used by integrator and field
+  # Higher K = finer integration, slower training
+  num_steps: 10
+
+  # Block width (time_varying only, ignored by stationary)
+  # Controls hidden dimension in each velocity block
+  width: 512
+
+  # Activation function for velocity blocks: "relu" | "gelu" | "tanh"
+  activation: relu
+
+  # Fourier positional encoding dimension (stationary only)
+  # Lower: faster, less expressive; Higher: slower, more expressive
+  fourier_n_e: 3
+
+  # (stationary only, ignored by time_varying)
+  # First-application neural network layer widths
+  # fa: [64, 64, 64]
+
+  # (stationary only, ignored by time_varying)
+  # Deformation-flow neural network layer widths (applied after Fourier features)
+  # df: [256, 256, 256, 256, 256]
+
+# ===== CODE (Shape Codes / Conditioning) =====
+code:
+  # Options: "none" | "auto_decoder" | "encoder"
+  # - none: no learned codes, field is unconditioned (Milestone A / pair mode)
+  # - auto_decoder: per-shape embeddings (Milestone B / cohort mode)
+  # - encoder: learned encoder (future: requires pretraining)
+  kind: none
+
+  # (auto_decoder / encoder only, ignored by none)
+  # Latent code dimension (controls conditioning expressivity)
+  # n_z: 256
+
+  # (auto_decoder / encoder only, ignored by none)
+  # Should code be projected to a spatial grid and interpolated at points?
+  # true: grid interpolation (spatial awareness, slower)
+  # false: broadcast code directly (simple, fast)
+  # position_aware: false
+
+  # (auto_decoder / encoder only, ignored by none)
+  # How to apply code features to velocity field
+  # Options: "concat" | "film"
+  # - concat: concatenate code features to position before passing to velocity network
+  # - film: Feature-wise Linear Modulation (use code to scale/bias velocity outputs)
+  # conditioning_method: concat
+
+  # (position_aware=true only, ignored if position_aware=false)
+  # Grid resolution for spatial interpolation (g³ grid)
+  # grid: 2
+
+  # (position_aware=true only, ignored if position_aware=false)
+  # Output channels per grid corner (feature dimension at each grid point)
+  # grid_channels: 32
+
+# ===== LOSS =====
+loss:
+  # Data term type: "chamfer" | "l2" | "weighted_chamfer" | "pcd" | "ncd" | "sinkhorn"
+  # - chamfer: bidirectional Chamfer distance (fast, differentiable)
+  # - l2: point-wise squared Euclidean distance (requires point correspondence)
+  # - weighted_chamfer: Chamfer with area-weighted target points
+  # - pcd: symmetric point cloud distance
+  # - ncd: normal-aware Chamfer (penalizes misaligned normals)
+  # - sinkhorn: optimal transport (requires geomloss, expensive)
+  data_name: chamfer
+
+  # Extra arguments for data term (passed as **kwargs to Registry.create)
+  # Example: { eps: 1e-3 } for small epsilon handling
+  data_kwargs: {}
+
+  # Loss direction: "forward" | "bidirectional"
+  # - forward: D(φ(source), target) + KE(forward)
+  # - bidirectional: D(φ(source), target) + D(φ⁻¹(target), source) + KE(forward) + KE(backward)
+  # Bidirectional requires flow.inverse() (ModifiedEuler)
+  direction: forward
+
+  # Gaussian noise scale for data term weight = 1 / (2·σ²)
+  # Larger σ: downweight data term (smoother deformations)
+  # Smaller σ: upweight data term (tighter fit)
+  sigma: 0.1
+
+  # Weight on kinetic energy regularization (sum of |v|² over trajectory)
+  # Higher: smoother, less deformation; Lower: sharper, more flexible
+  kinetic_weight: 1.0
+
+  # Weight on code regularization (only if kind: auto_decoder)
+  # Penalizes large embedding magnitudes to prevent mode collapse
+  # 0.0 = disabled
+  code_reg_weight: 0.0
+
+  # L2 regularization on flow parameters only (not codes)
+  # 0.0 = no regularization
+  weight_decay: 0.0
+
+  # Weight on isometry loss (strain energy, structure preservation)
+  # 0.0 = disabled (default)
+  # High: strongly preserve local geometry (less deformation freedom)
+  isometry_weight: 0.0
+
+  # (isometry_weight > 0 only)
+  # Isometry loss type: "strain" | "det" | "orthogonal"
+  # - strain: Frobenius norm of (J^T·J - I) where J is Jacobian
+  # - det: log|det(J)| (volume preservation)
+  # - orthogonal: (J^T·J - I) + (J·J^T - I) (orthogonal deformations)
+  # isometry_type: strain
+
+  # (isometry_weight > 0 only)
+  # Number of points to sample for isometry loss each step
+  # Lower: faster (uses random subset); Higher: more accurate (full resolution)
+  # isometry_samples: 64
+
+  # Random subsampling: subsample predicted shape to N points each step
+  # Target shape always kept at full resolution (for gradient-free comparison)
+  # 0 = disabled (use full predicted point cloud)
+  # N > 0: keep N random points per step (torch.randperm for O(1) memory)
+  # Use for high-density shapes (>100k vertices) to reduce loss computation
+  subsample_M: 2000
+
+# ===== TRAINING =====
+train:
+  # Training mode: "pair" | "cohort"
+  # - pair: single deformation (loads source + target directly)
+  # - cohort: multiple shapes (loads all from source_dir, registers each to target)
+  mode: pair
+
+  # Total training steps
+  steps: 2000
+
+  # Batch size (cohort mode only, ignored by pair)
+  # batch: 8
+
+  # Learning rate for optimizer
+  lr: 1e-4
+
+  # Random seed for reproducibility
+  # None = no seeding (nondeterministic)
+  seed: 42
+
+  # Print loss every N steps
+  log_every: 50
+
+  # Export trajectory (shapes at intermediate steps) every N steps
+  save_every: 500
+
+  # Validation every N steps (0 = disabled)
+  val_every: 0
+
+  # Number of shapes to export from trajectory
+  # 0 = export all shapes
+  # For pair mode: always 1 (only source shape registered)
+  # For cohort mode: min(batch_size, number_of_cohort_shapes)
+  export_shapes: 0
+
+  # Strategy for choosing which shapes to export: "sequential" | "random"
+  # - sequential: export shapes 0, 1, 2, ...
+  # - random: export random shapes each save_every (uses cfg.train.seed for reproducibility)
+  export_strategy: sequential

@@ -17,9 +17,10 @@ class FieldCfg:
 class CodeCfg:
     kind: str = "none"                      # none | auto_decoder | encoder
     n_z: int = 256
-    conditioning: str = "none"              # none | concat | position_aware
-    grid: int = 2                           # g
-    grid_channels: int = 32                 # C — grid-head output per corner
+    position_aware: bool = False            # use grid interpolation (True) or broadcast (False)?
+    conditioning_method: str = "concat"     # concat | film — how to apply features to velocity
+    grid: int = 2                           # g — grid resolution (only if position_aware=True)
+    grid_channels: int = 32                 # C — grid-head output per corner (only if position_aware=True)
 
 
 @dataclass
@@ -34,7 +35,24 @@ class LossCfg:
     isometry_weight: float = 0.0            # disabled by default
     isometry_type: str = "strain"           # or "det" / "orthogonal"
     isometry_samples: int = 64              # points per step for isometry (64 = ~5x speedup)
-    subsample_M: int = 2000                 # random subsample pred to N points; 0 = disabled
+    subsample_M: float = 2000               # subsample source to N points before flow. int (absolute) or 0<x<1 (fraction); 0 = disabled
+    save_full: bool = False                 # when subsampling: also compute and export full trajectory
+
+    def resolve_subsample_count(self, n_source: int) -> int:
+        """Resolve subsample_M to absolute point count given source size.
+
+        Args:
+            n_source: number of source points
+
+        Returns:
+            Absolute number of points to subsample to (or 0 if disabled)
+        """
+        if self.subsample_M == 0:
+            return 0
+        if self.subsample_M >= 1:
+            return int(self.subsample_M)
+        # Treat as fraction
+        return max(1, int(self.subsample_M * n_source))
 
 @dataclass
 class TrainCfg:

@@ -1,6 +1,6 @@
 # ResNet-LDDMM Architecture
 
-A clean, modular implementation of **neural ODE diffeomorphic shape registration**, supporting both single-pair (Milestone A) and cohort-based (Milestone B) training with swappable components and lazy configuration.
+A clean, modular implementation of **neural ODE diffeomorphic shape registration**, supporting both single-pair (pair mode) and cohort-based (cohort mode) training with swappable components and lazy configuration.
 
 ---
 
@@ -13,17 +13,17 @@ This codebase registers 3D shapes by learning a **velocity field** that deforms 
 - **Learnable codes** (optional): per-shape latent vectors enable amortisation across cohorts
 - **Pluggable data terms**: Chamfer distance, weighted variants, normal-aware, and optimal transport
 
-### Two Milestones, One Backend
+### Two Training Modes, One Backend
 
-| Axis | **Milestone A (PoC)** | **Milestone B (Amortised)** |
+| Axis | **Pair Mode** | **Cohort Mode** |
 |------|------|---------|
-| **Field** | Time-varying (per-step blocks) | Stationary (one net, reused) |
-| **Codes** | None (per-pair) | Auto-decoder or encoder |
+| **Field** | Time-varying (per-step blocks) | Stationary (one net, reused) or time-varying |
+| **Codes** | None (unconditioned) | Auto-decoder or encoder |
 | **Training** | One pair at a time | Whole cohort, batch training |
 | **Inverse** | (n/a) | Modified Euler backward |
 | **Loss** | Unidirectional | Bidirectional |
 
-**Design principle**: Both milestones instantiate the same architecture. The orthogonal axes (time-dependence and code-conditioning) are independent — a valid config matrix has **four cells**, three implemented here (fourth is a free ablation).
+**Design principle**: Both modes instantiate the same architecture. The orthogonal axes (time-dependence and code-conditioning) are independent — a valid config matrix has **four cells**, three implemented in pair/cohort cores (fourth is a free ablation).
 
 ---
 
@@ -54,9 +54,9 @@ Integrator (ABC)
 
 Conditioning (ABC)
   → NoConditioning (identity)
-  → ConcatConditioning (direct append)
-  → FiLMConditioning
-  → PositionAware (AD-SVFD: grid interpolation)
+  → ConcatConditioning (broadcast code to per-point features)
+  → FiLMConditioning (feature-wise linear modulation)
+  → PositionAware (grid interpolation + trilinear sampling)
 ```
 
 Each ABC specifies:
@@ -115,6 +115,18 @@ When a dependency is missing:
 - Configs that don't use it still work
 - Configs that require it raise `ImportError` at **runtime** (during `forward()`), not import time
 - Tests can run with `sys.modules` poisoned to verify lazy-loading guarantee
+
+### 2.5 Random Subsampling for High-Resolution Efficiency
+
+For high-density shapes (>100k vertices), point-wise loss computation becomes expensive. **Per-step random subsampling** reduces memory and compute:
+
+- On each training step, the predicted shape is randomly subsampled to N points
+- The target shape is kept at full resolution
+- Subsampling uses `torch.randperm(N, device=device)[:n_subsample]` (O(1) memory, deterministic within a step)
+- Gradient flow to full parameter set is preserved via chain rule through the subsampled points
+- Configured via `loss.subsample_M` (0 = disabled, N = keep N random points per step)
+
+This differs from multi-resolution pyramids: no separate loss functions per resolution, just a single Chamfer distance on a random subset of predicted points.
 
 ---
 
@@ -179,7 +191,7 @@ class ShapeCode(nn.Module, ABC):
 **Semantics**: Maps batch → codes (or None). The stepper never knows which implementation is used.
 
 **Implementations**:
-- **NoCode**: Returns `None, None` (unconditioned, Milestone A)
+- **NoCode**: Returns `None, None` (unconditioned, pair mode)
 - **AutoDecoderCodes**: `nn.Embedding(num_shapes, n_z)`, indexed by shape id. `penalty()` returns ‖Z‖²
 - **EncoderCodes**: Wraps GroupEncoder. `penalty()` returns None (encoder is pretrained)
 
@@ -192,8 +204,8 @@ class DataTerm(RegistrationLoss, ABC):
                 tgt_w: Optional[Tensor] = None,
                 normals: Optional[Tensor] = None) -> Tensor:
         """
-        pred: [B, N, 3] predicted point cloud
-        target: [B, M, 3] target point cloud
+        pred: [B, N, 3] predicted point cloud (may be subsampled)
+        target: [B, M, 3] target point cloud (full resolution)
         pred_w, tgt_w: [B, N] / [B, M] per-point weights (optional)
         normals: [B, M, 3] target surface normals (optional)
         
@@ -201,14 +213,14 @@ class DataTerm(RegistrationLoss, ABC):
         """
 ```
 
-**Semantics**: Maps predicted and target point clouds → scalar loss. Signature is **consistent across all variants** — extra signals (weights, normals) flow through the same interface.
+**Semantics**: Maps predicted and target point clouds → scalar loss. Signature is **consistent across all variants** — extra signals (weights, normals) flow through the same interface. Predicted points may be subsampled; target is always full resolution.
 
 **Implementations**:
 - **CDData**: Chamfer distance via reused `chamfer_loss`
 - **L2Data**: Per-point MSE
 - **WeightedCDData**: Chamfer with target-point weighting (area-weighted)
 - **PCDData**: Symmetric point cloud distance
-- **NCDData**: Normal-aware: penalizes misaligned normals
+- **NCDData**: Normal-aware: penalizes misaligned normals (vectorized batch operations)
 - **SinkhornData**: Optimal transport via geomloss (lazily loaded)
 
 ### 3.5 Conditioning
@@ -226,14 +238,46 @@ class Conditioning(nn.Module, ABC):
         """
 ```
 
-**Semantics**: Broadcasts a global code to per-point features. The field decides how to use them; conditioning decides how to expand them.
+**Semantics**: Expands global code to per-point features (or modulates velocity field). Two orthogonal choices:
+1. **Spatial projection**: grid interpolation (`position_aware=true`) or broadcast (`position_aware=false`)?
+2. **Application**: concatenate features (`conditioning_method=concat`) or modulate with FiLM (`conditioning_method=film`)?
+
+**Spatial Projection**:
+- **PositionAware** (`position_aware=true`): code → g³ grid → trilinear interpolate at point positions → `[B, N, grid_channels]`
+- **Broadcast** (`position_aware=false`): code broadcast to every point → `[B, N, n_z]`
+
+**Application Method** (to projection output):
+- **Concat** (`conditioning_method=concat`): concatenate features with positions → velocity network
+- **FiLM** (`conditioning_method=film`): use features to modulate velocity via scale/bias (γ ⊙ v + β)
 
 **Implementations**:
-- **NoConditioning**: `dim=0`, returns None
-- **ConcatConditioning**: Broadcasts code, returns `[B, N, n_z]`
-- **PositionAware**: Grid-head linear layer → reshape → trilinear interpolation (AD-SVFD)
+- **NoConditioning**: returns None (when `kind=none`)
+- **ConcatConditioning**: broadcasts code to `[B, N, n_z]`
+- **PositionAware**: grid projection + trilinear interpolation → `[B, N, grid_channels]`
+- **FiLMConditioning**: code → scale (γ) and bias (β) for affine modulation of velocity
 
-### 3.6 NeuralODEFlow
+### 3.6 MappingError (Strategy Pattern)
+
+```python
+class MappingError(ABC):
+    def __call__(self, flow, data_term, source, target, code) -> Tuple[Tensor, Tensor]:
+        """
+        Returns: (data_loss, kinetic_energy) tuple
+        """
+```
+
+**Semantics**: Encapsulates the loss computation strategy (unidirectional vs bidirectional).
+
+**Implementations**:
+- **UnidirectionalMappingError**: Only forward trajectory. Used in pair mode.
+  - Returns D(φ(source), target) + KE(forward)
+  - Optionally subsamples predicted shape to N random points
+  
+- **BidirectionalMappingError**: Both forward and backward trajectories. Used in cohort mode.
+  - Returns D(φ(source), target) + D(φ⁻¹(target), source) + KE(forward) + KE(backward)
+  - Subsamples forward and backward predicted shapes independently
+
+### 3.7 NeuralODEFlow
 
 Not an ABC, but the facade that wires components together:
 
@@ -289,13 +333,12 @@ src/resnet_lddmm/
 │
 ├── losses/                       # Loss terms
 │   ├── data_terms.py             # DataTerm ABC + implementations
-│   ├── mapping_error.py          # Unidirectional/Bidirectional strategies
+│   ├── mapping_error.py          # Unidirectional/Bidirectional strategies + subsampling
 │   └── __init__.py
 │
 ├── registration/                 # Steppers (training orchestration)
-│   ├── pair.py                   # PairRegistration (Milestone A)
-│   ├── cohort.py                 # CohortRegistration (Milestone B)
-│   ├── subsample.py              # Adaptive subsampling (T28)
+│   ├── pair.py                   # PairRegistration (pair mode)
+│   ├── cohort.py                 # CohortRegistration (cohort mode)
 │   └── __init__.py
 │
 ├── integrators.py                # Integrator ABC + ForwardEuler, ModifiedEuler
@@ -364,9 +407,12 @@ Orchestrator.on_step_start()
   │   │   └─ Integrator.integrate() → loop K steps:
   │   │       └─ v = field(q_k, step=k, code=code) → [B,N,3]
   │   │       └─ q_{k+1} = q_k + (1/K)·v
-  │   ├─ traj_bwd = flow.inverse(target.points, code)  [bidirectional only]
-  │   ├─ data_loss = data_term(traj_fwd.end, target.points, ...)
-  │   ├─ kinetic_loss = traj.kinetic_energy()
+  │   ├─ pred_fwd = traj_fwd.end (optionally subsampled)
+  │   ├─ traj_bwd = flow.inverse(target.points, code)  [cohort mode only]
+  │   ├─ pred_bwd = traj_bwd.end (optionally subsampled) [cohort mode only]
+  │   ├─ data_loss = data_term(pred_fwd, target.points, ...)
+  │   │   [+ data_term(pred_bwd, source.points, ...) if cohort mode]
+  │   ├─ kinetic_loss = traj_fwd.kinetic_energy() [+ traj_bwd if cohort]
   │   ├─ code_reg = code_source.penalty()               [if auto_decoder]
   │   ├─ isometry_loss = iso_loss(traj, field)          [if enabled]
   │   ├─ total_loss = Composer.compute({data, kinetic, code_reg, isometry})
@@ -411,8 +457,10 @@ ExperimentCfg
   ├─ code: CodeCfg
   │   ├─ kind: str              # none | auto_decoder | encoder
   │   ├─ n_z: int               # code dimension
-  │   ├─ conditioning: str       # none | concat | position_aware
-  │   └─ grid: int, grid_channels: int
+  │   ├─ position_aware: bool    # grid interpolation (true) or broadcast (false)?
+  │   ├─ conditioning_method: str # concat | film (how to apply features to velocity)
+  │   ├─ grid: int              # grid resolution (only if position_aware=true)
+  │   └─ grid_channels: int      # feature dim per grid corner (only if position_aware=true)
   ├─ loss: LossCfg
   │   ├─ data_name: str         # chamfer | l2 | weighted_chamfer | ...
   │   ├─ data_kwargs: dict
@@ -420,8 +468,11 @@ ExperimentCfg
   │   ├─ sigma: float           # data term weight = 1/(2σ²)
   │   ├─ kinetic_weight: float
   │   ├─ code_reg_weight: float
-  │   ├─ weight_decay: float
-  │   └─ isometry_weight: float
+  │   ├─ weight_decay: float    # L2 regularization on flow parameters
+  │   ├─ isometry_weight: float
+  │   ├─ isometry_type: str     # strain | det | orthogonal
+  │   ├─ isometry_samples: int  # points per step for isometry sampling
+  │   └─ subsample_M: int       # random subsample pred to N points; 0 = disabled
   └─ train: TrainCfg
       ├─ mode: str             # pair | cohort
       ├─ steps: int
@@ -440,28 +491,73 @@ ExperimentCfg
 
 ### 6.3 Configuration Examples
 
-**Milestone A (time-varying + none)**:
+**Pair Mode (time-varying + none)**:
 ```yaml
-field: { kind: time_varying, num_steps: 10, width: 512, activation: relu }
-code: { kind: none }
-loss: { data_name: chamfer, direction: forward, sigma: 0.1, kinetic_weight: 1.0 }
-train: { mode: pair, steps: 2000, lr: 1e-4 }
+source: path/to/source.obj
+target: path/to/target.obj
+output_dir: outputs/my_pair
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 512
+  activation: relu
+code:
+  kind: none
+loss:
+  data_name: chamfer
+  direction: forward
+  sigma: 0.1
+  kinetic_weight: 1.0
+  subsample_M: 2000
+train:
+  mode: pair
+  steps: 2000
+  lr: 1e-4
 ```
 
-**Milestone B (stationary + auto_decoder)**:
+**Cohort Mode (stationary + auto_decoder)**:
 ```yaml
-field: { kind: stationary, num_steps: 10, fa: [64,64,64], df: [256,256,256,256,256], fourier_n_e: 3 }
-code: { kind: auto_decoder, n_z: 256, conditioning: position_aware }
-loss: { data_name: chamfer, direction: bidirectional, kinetic_weight: 1e-4, code_reg_weight: 1e-3 }
-train: { mode: cohort, steps: 2000, batch: 8, lr: 1e-3 }
+source: path/to/cohort_folder
+target: path/to/template.obj
+output_dir: outputs/my_cohort
+field:
+  kind: stationary
+  num_steps: 10
+  fa: [64, 64, 64]
+  df: [256, 256, 256, 256, 256]
+  fourier_n_e: 3
+code:
+  kind: auto_decoder
+  n_z: 256
+  conditioning: position_aware
+loss:
+  data_name: chamfer
+  direction: bidirectional
+  kinetic_weight: 1e-4
+  code_reg_weight: 1e-3
+  subsample_M: 0
+train:
+  mode: cohort
+  steps: 2000
+  batch: 8
+  lr: 1e-3
 ```
 
-**Phase 9 ablation (time-varying + auto_decoder)**:
+**Ablation (time-varying + auto_decoder)**:
 ```yaml
-field: { kind: time_varying, num_steps: 10, width: 512 }
-code: { kind: auto_decoder, n_z: 256 }  ← orthogonal axes, same interface
-loss: { data_name: chamfer, direction: bidirectional }
-train: { mode: cohort, steps: 2000 }
+field:
+  kind: time_varying
+  num_steps: 10
+  width: 512
+code:
+  kind: auto_decoder
+  n_z: 256
+loss:
+  data_name: chamfer
+  direction: bidirectional
+train:
+  mode: cohort
+  steps: 2000
 ```
 
 ---
@@ -507,11 +603,12 @@ def build(cfg: ExperimentCfg) -> (Stepper, Loader, Transform):
         LossTerm("isometry", weight=cfg.loss.isometry_weight),
     ])
     
-    # 6. Mapping error strategy
+    # 6. Mapping error strategy (with optional subsampling)
+    subsample_n = cfg.loss.subsample_M if cfg.loss.subsample_M > 0 else None
     if cfg.loss.direction == "bidirectional":
-        mapping_error = BidirectionalMappingError()
+        mapping_error = BidirectionalMappingError(subsample_pred_n=subsample_n)
     else:
-        mapping_error = UnidirectionalMappingError()
+        mapping_error = UnidirectionalMappingError(subsample_pred_n=subsample_n)
     
     # 7. Branch on training mode
     if cfg.train.mode == "cohort":
@@ -522,19 +619,21 @@ def build(cfg: ExperimentCfg) -> (Stepper, Loader, Transform):
 
 ### 7.2 _build_pair() vs _build_cohort()
 
-**Pair** (Milestone A):
+**Pair Mode**:
 - Loads two shapes, normalizes jointly
 - Creates `OneBatchLoader` (returns same batch every step)
 - Code source: `Registry.create("code", "none")` → NoCode
 - Optimizer: single param group (flow only)
 - Stepper: `PairRegistration`
+- Loss: unidirectional only
 
-**Cohort** (Milestone B):
+**Cohort Mode**:
 - Loads all shapes from directory, normalizes jointly with template
 - Creates `CohortBatchLoader` (batches shapes, samples each training step)
 - Code source: `Registry.create("code", "auto_decoder", num_shapes=..., n_z=...)`
 - Optimizer: **two param groups** (flow with weight_decay, codes without)
 - Stepper: `CohortRegistration`
+- Loss: bidirectional by default (but configurable)
 
 The steppers (`PairRegistration`, `CohortRegistration`) differ only in:
 - How they index codes (per-batch vs. per-shape)
@@ -607,7 +706,7 @@ Steppers call `flow.forward()` and `flow.inverse()` without knowing about integr
 
 ### 9.3 Strategy Pattern
 
-**MappingError** encapsulates loss direction (unidirectional vs bidirectional):
+**MappingError** encapsulates loss direction (unidirectional vs bidirectional) and subsampling strategy:
 
 ```python
 class MappingError(ABC):
@@ -615,18 +714,32 @@ class MappingError(ABC):
         """Compute (data_loss, kinetic_loss)"""
 
 class UnidirectionalMappingError(MappingError):
+    def __init__(self, subsample_pred_n=None):
+        self.subsample_pred_n = subsample_pred_n
+    
     def __call__(self, ...):
         traj = flow(source.points, code)
-        data = data_term(traj.end, target.points, ...)
+        pred = traj.end
+        if self.subsample_pred_n:
+            pred = self._subsample_points(pred, self.subsample_pred_n)
+        data = data_term(pred, target.points, ...)
         kinetic = traj.kinetic_energy()
         return data, kinetic
 
 class BidirectionalMappingError(MappingError):
+    def __init__(self, subsample_pred_n=None):
+        self.subsample_pred_n = subsample_pred_n
+    
     def __call__(self, ...):
         traj_fwd = flow(source.points, code)
         traj_bwd = flow.inverse(target.points, code)
-        data = data_term(traj_fwd.end, target.points, ...) + \
-               data_term(traj_bwd.end, source.points, ...)
+        pred_fwd = traj_fwd.end
+        pred_bwd = traj_bwd.end
+        if self.subsample_pred_n:
+            pred_fwd = self._subsample_points(pred_fwd, self.subsample_pred_n)
+            pred_bwd = self._subsample_points(pred_bwd, self.subsample_pred_n)
+        data = data_term(pred_fwd, target.points, ...) + \
+               data_term(pred_bwd, source.points, ...)
         kinetic = traj_fwd.kinetic_energy() + traj_bwd.kinetic_energy()
         return data, kinetic
 ```
@@ -711,7 +824,7 @@ runner.run(cfg)
       → IsometryLoss(...)
     → LossComposer([data, kinetic, code_reg, isometry])
     → torch.optim.Adam([flow params, code params], lr=1e-3)
-    → CohortRegistration(flow, codes, data_term, bidirectional, composer, optimizer, iso_loss)
+    → CohortRegistration(flow, codes, data_term, mapping_error, composer, optimizer, iso_loss)
     → return (stepper, loader, transform)
   → build callbacks
     → VerboseCallback(log_every=50)
@@ -736,8 +849,11 @@ orchestrator.run(num_steps=2000)
       → traj_bwd = flow.inverse(target_points, code)
         → ModifiedEuler.integrate(qT, field, code, 10)
           [similar, but backward with reversed steps]
-      → data_loss = data_term(traj_fwd.end, target.points, target.weights, normals=...)
+      → pred_fwd = traj_fwd.end (optionally subsampled to 2000 points)
+      → pred_bwd = traj_bwd.end (optionally subsampled to 2000 points)
+      → data_loss = data_term(pred_fwd, target.points, target.weights, normals=...)
         → Chamfer distance (or weighted variant)
+        + data_term(pred_bwd, source.points, source.weights, ...)
       → kinetic_loss = traj_fwd.kinetic_energy() + traj_bwd.kinetic_energy()
       → code_reg_loss = code_source.penalty()
         → ‖Z‖²_F (Frobenius norm of embedding table)
@@ -982,13 +1098,29 @@ normalized = joint_normalize([source, target])
 source_norm, target_norm = normalized  # ← Same frame
 ```
 
+### 13.5 Subsampling Invariant
+
+❌ **Wrong**: Subsampling before loss computation breaks gradient flow
+```python
+pred = self._subsample_points(pred, self.subsample_pred_n)
+data = data_term(pred, target)  # ← Loses gradient signal to full param set
+```
+
+✓ **Right**: Subsampling inside mapping_error, before data_term
+```python
+pred = traj.end  # Full predicted shape
+if self.subsample_pred_n:
+    pred = self._subsample_points(pred, self.subsample_pred_n)
+data = data_term(pred, target)  # ← Gradients flow through subsampled indices to all params
+```
+
 ---
 
 ## 14. Summary
 
 **ResNet-LDDMM** is a modular shape registration system built on:
 
-1. **Four core ABCs** (VelocityField, Integrator, ShapeCode, DataTerm, Conditioning)
+1. **Four core ABCs** (VelocityField, Integrator, ShapeCode, DataTerm, Conditioning, MappingError)
    - Define contracts, enable swapping
    - Implementations added without changing existing code
 
@@ -1000,7 +1132,7 @@ source_norm, target_norm = normalized  # ← Same frame
 3. **Configuration-first design**
    - YAML → dataclass → components
    - Unknown keys caught early
-   - Supports the full 2×2 design space
+   - Supports the full 2×2 design space (time-varying × code-conditioning)
 
 4. **Lazy loading for optional dependencies**
    - geomloss, e3nn imported only if used
@@ -1010,10 +1142,16 @@ source_norm, target_norm = normalized  # ← Same frame
    - Time-dependence (time-varying vs. stationary) ⊥ code-conditioning (none vs. auto-decoder vs. encoder)
    - Four valid config combinations (three implemented, fourth is free ablation)
 
+6. **Per-step random subsampling for high-resolution efficiency**
+   - Predicted shape subsampled to N random points each step
+   - Target shape at full resolution
+   - Gradients preserved through random indices back to all parameters
+   - Configured via `loss.subsample_M`
+
 An engineer reading this document should be able to:
 - Trace a request from YAML config to tensor operations
 - Add a new component (field, loss, code) in five lines
 - Understand why design decisions were made (invariants, contracts)
 - Test in isolation and integration
 - Debug issues by inspecting the composition root
-
+- Configure subsampling for high-density shapes without pyramid hierarchies

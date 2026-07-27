@@ -1,0 +1,279 @@
+# Example: Cohort Mode (Full Configuration)
+#
+# Trains a shared deformation field across a cohort of shapes.
+# Stationary field (one backbone reused) + auto-decoder codes (per-shape embeddings).
+# Bidirectional loss for amortized registration.
+#
+# This configuration demonstrates ALL available options across all sections.
+
+# ===== REQUIRED =====
+source: data/rabbit/cohort/
+target: data/rabbit/template.obj
+output_dir: outputs/example_cohort_full
+
+# ===== FIELD (Velocity Field) =====
+field:
+  # Options: "time_varying" | "stationary"
+  # Demonstration: Using stationary (single backbone reused K times)
+  # vs time_varying (L separate blocks, one per step)
+  # - stationary: parameter-efficient, lower memory, (suitable for cohorts)
+  # - time_varying: per-step flexibility, (suited for single pairs)
+  kind: stationary
+
+  # Number of ODE integration steps
+  # This is THE SINGLE SOURCE OF TRUTH for K
+  # Shared by: ForwardEuler, ModifiedEuler, and all velocity evaluations
+  # Higher K (e.g., 20) = finer integration at cost of slower training
+  num_steps: 10
+
+  # Block width (time_varying only, ignored by stationary)
+  # If we switched to time_varying, this would control hidden dim of each block
+  # width: 512
+
+  # Activation function: "relu" | "gelu" | "tanh"
+  # relu: fast, sparse gradient paths (default)
+  # gelu: smooth gradient flow, slightly slower
+  # tanh: bounded output, can saturate on large deformations
+  activation: relu
+
+  # ---- Stationary Field Architecture ----
+  # First-application NN: maps positions to Fourier features to hidden space
+  # These are applied sequentially (FA output → DF input)
+  fa: [64, 64, 64]
+
+  # Deformation-flow NN: applied to Fourier-encoded positions
+  # Maps hidden space → velocity field
+  # Larger networks = more expressive but slower and higher memory
+  df: [256, 256, 256, 256, 256]
+
+  # Fourier positional encoding dimension
+  # Encodes 3D position as sin/cos features before DF network
+  # Higher n_e = more fine-grained positional information
+  # Typical: 3 (captures local deformation), 4-5 (finer details)
+  fourier_n_e: 3
+
+# ===== CODE (Shape Codes / Conditioning) =====
+code:
+  # Options: "none" | "auto_decoder" | "encoder"
+  # Demonstration: Using auto_decoder (per-shape embeddings)
+  # - none: unconditioned field (Milestone A, pair mode only)
+  # - auto_decoder: per-shape latent codes (Milestone B, cohort mode)
+  #   → One embedding vector per shape, learned end-to-end
+  #   → Enables amortization: different shapes get different codes
+  # - encoder: learned encoder from shape to code (future feature)
+  kind: auto_decoder
+
+  # Latent code dimension (n_z)
+  # Each shape gets a [1, n_z] embedding vector
+  # Higher n_z: more expressivity per shape, higher memory/regularization cost
+  # Typical: 64 (small cohorts), 256 (large cohorts)
+  n_z: 256
+
+  # ---- Spatial Projection (Orthogonal Axis 1) ----
+  # Should code be projected to a spatial grid and interpolated at points?
+  # true: grid interpolation (position-aware, AD-SVFD style)
+  #   → Code projected to g³ grid, trilinear interpolated at each point
+  #   → Better preserves local structure, slightly slower
+  # false: broadcast code directly (simple, fast)
+  #   → Code [B,n_z] broadcast to [B,N,n_z]
+  position_aware: true
+
+  # ---- Feature Application Method (Orthogonal Axis 2) ----
+  # How to apply code features to velocity field
+  # Options: "concat" | "film"
+  # - concat: concatenate features to position before passing to velocity network
+  #   → Simple, traditional approach
+  # - film: Feature-wise Linear Modulation (use features to scale/bias velocity)
+  #   → More parameter-efficient, modulates learned velocity
+  # This choice is independent of position_aware
+  conditioning_method: concat
+
+  # ---- Grid Parameters (only used if position_aware=true) ----
+  # Grid resolution for spatial interpolation (g³ control grid)
+  # grid=2: 2×2×2 = 8 corners (fast, coarse spatial control)
+  # grid=3: 3×3×3 = 27 corners (finer spatial control)
+  # Higher grid: better spatial expressivity, higher memory/computation
+  grid: 2
+
+  # Output channels per grid corner
+  # After linear projection, code [B,n_z] becomes [B, grid³, grid_channels]
+  # These grid_channels-dim features are trilinearly interpolated at each point
+  # Higher grid_channels: more spatial expressivity per corner
+  grid_channels: 32
+
+# ===== LOSS =====
+loss:
+  # Data term type
+  # Options: "chamfer" | "l2" | "weighted_chamfer" | "pcd" | "ncd" | "sinkhorn"
+  # Demonstration: Using chamfer (default, fast, works well)
+  # - chamfer: D_pred→tgt + D_tgt→pred (bidirectional by default)
+  # - l2: point-wise MSE (requires known correspondence)
+  # - weighted_chamfer: area-weighted Chamfer (if shape has weights)
+  # - pcd: symmetric PC distance (robust to outliers)
+  # - ncd: normal-aware Chamfer (uses surface normals from shapes)
+  # - sinkhorn: optimal transport (requires geomloss, expensive but accurate)
+  data_name: chamfer
+
+  # Extra kwargs passed to data term at Registry.create()
+  # Example: { symmetric: true } for some data terms
+  # Most data terms use empty dict
+  data_kwargs: {}
+
+  # Loss direction: "forward" | "bidirectional"
+  # Demonstration: Using bidirectional (cohort mode typically uses this)
+  # - forward: D(φ(source), target) + KE_fwd only
+  #   → Fast, used in pair mode (single direction)
+  # - bidirectional: D(φ(source), target) + D(φ⁻¹(target), source) + KE_fwd + KE_bwd
+  #   → Symmetric loss, requires invertible flow, used in cohort mode
+  #   → Ensures both forward and backward deformations are valid
+  direction: bidirectional
+
+  # Gaussian noise scale for data term weighting
+  # Actual weight = 1 / (2·σ²)
+  # σ=0.1 → weight ≈ 50 (strong data fitting pressure)
+  # σ=1.0 → weight ≈ 0.5 (weak data fitting, allow smooth deformations)
+  # Tune this if convergence is too slow (decrease σ) or shapes don't align (increase σ)
+  sigma: 0.1
+
+  # Weight on kinetic energy regularization
+  # Kinetic = ∫ |v|² dt over trajectory
+  # Higher weight: smooth, low-velocity deformations (regularized)
+  # Lower weight: allow large deformations (less constrained)
+  # 0.0: no regularization (shapes will contort aggressively)
+  # 1.0: strong smoothness (default)
+  kinetic_weight: 1e-4
+
+  # Weight on code regularization (auto_decoder only)
+  # Penalizes ||Z||_F² to prevent codes from growing unbounded
+  # Helps prevent mode collapse (all shapes getting same code)
+  # 0.0: no regularization (codes can be large, overfitting)
+  # 1e-3: moderate regularization (prevents overfitting)
+  # 1e-2: strong regularization (forces economy of latent space)
+  # Only active if kind: auto_decoder
+  code_reg_weight: 1e-3
+
+  # L2 regularization on flow parameters ONLY (not codes)
+  # Applied to flow.parameters() during optimizer step
+  # Typical: 0.0 (no flow regularization)
+  # Use if: overfitting to cohort (try 1e-5 or 1e-4)
+  weight_decay: 0.0
+
+  # ---- Isometry Loss (Structure Preservation) ----
+  # Penalizes non-rigid deformations (preserves local geometry)
+  # 0.0: disabled (default)
+  # > 0: enabled, loss = isometry_weight * isometry_loss
+  # Use for: shapes where bending without stretching is important
+  # (e.g., anatomical structures, cloth)
+  isometry_weight: 0.0
+
+  # Isometry loss type: "strain" | "det" | "orthogonal"
+  # Only used if isometry_weight > 0
+  # - strain: Frobenius ||J^T·J - I||² where J = ∇φ
+  #   → Penalizes stretching/compression of local neighborhoods
+  # - det: |log(|det(J)|)|
+  #   → Penalizes volume change
+  # - orthogonal: ||J^T·J - I||² + ||J·J^T - I||²
+  #   → Requires deformation to be nearly rotation (very restrictive)
+  isometry_type: strain
+
+  # Number of points to sample for isometry computation each step
+  # 64: fast (uses 64 random points)
+  # 256: more accurate (uses 256 points)
+  # 0: use all points (slow for high-density shapes)
+  # Only used if isometry_weight > 0
+  isometry_samples: 64
+
+  # ---- Random Subsampling ----
+  # Per-step random subsampling of predicted shape for efficiency
+  # Target shape is always full-resolution (gradients don't flow there)
+  # Predicted shape subsampled to N random points each training step
+  # Uses torch.randperm (O(1) memory, deterministic per step)
+  #
+  # Why: High-density shapes (>100k vertices) make Chamfer expensive.
+  #      This reduces loss computation from O(N_pred * N_target) → O(M * N_target)
+  #      where M = subsample_M << N_pred
+  #
+  # Gradient flow: Subsampled indices create a mask on pred.
+  #                Gradients flow back through the mask to all flow parameters.
+  #                No gradient information is lost (all parameters updated).
+  #
+  # 0: disabled (use full predicted point cloud)
+  # 2000: keep 2000 random points per step (typical for 200k vertex shapes)
+  subsample_M: 2000
+
+# ===== TRAINING =====
+train:
+  # Training mode: "pair" | "cohort"
+  # Demonstration: Using cohort (multiple shapes, batch training)
+  # - pair: one source-target pair
+  #   → Loads two files directly
+  #   → Smaller memory footprint
+  #   → No codes (kind: none)
+  # - cohort: directory of source shapes + one target template
+  #   → Loads all shapes from source_dir/
+  #   → Batch training (multiple shapes per step)
+  #   → Requires kind: auto_decoder or encoder
+  mode: cohort
+
+  # Total optimization steps
+  # Each step: sample one batch from cohort, one gradient update
+  # Higher: longer training, better convergence (diminishing returns)
+  # Typical: 1000-5000 for cohorts
+  steps: 2000
+
+  # Batch size (cohort mode only)
+  # Number of shapes per gradient update
+  # Higher batch: more stable gradients, higher memory
+  # Lower batch: noisier gradients, lower memory (useful for large shapes)
+  # Typical: 4-16 depending on shape density and GPU VRAM
+  batch: 8
+
+  # Learning rate for all parameters (flow + codes if auto_decoder)
+  # Higher: faster training, risk of divergence
+  # Lower: stable training, slower convergence
+  # Typical: 1e-4 (conservative, safe), 1e-3 (aggressive)
+  # If loss explodes: decrease lr
+  # If loss plateaus: try smaller lr (e.g., 1e-5) and longer training
+  lr: 1e-3
+
+  # Random seed for reproducibility
+  # Seeding affects:
+  # - torch.manual_seed (parameter initialization)
+  # - np.random.seed (data loading, if used)
+  # - random.seed (Python random)
+  # - DataLoader shuffling (if enabled)
+  # Set to None for nondeterministic runs (different results each time)
+  # Set to integer for reproducible runs (same results every run)
+  seed: 42
+
+  # ---- Logging and Export ----
+  # Print loss every N steps to console
+  # Higher: less output, faster training
+  # Lower: detailed progress tracking
+  log_every: 50
+
+  # Save trajectory (shapes at intermediate steps) to disk every N steps
+  # Files saved to: output_dir/step_{step_number}/
+  # Higher: fewer saves (disk-efficient)
+  # Lower: more intermediate checkpoints (good for debugging, animation)
+  # If 0: only final step saved
+  save_every: 500
+
+  # Run validation every N steps
+  # 0: no validation (default)
+  # > 0: compute validation loss on held-out shapes every N steps
+  # Requires separate validation split (not yet implemented)
+  val_every: 0
+
+  # Number of shapes to export from each trajectory save
+  # 0: export all shapes in batch
+  # 1: export only first shape (memory-efficient)
+  # N: export first N shapes (balance between storage and detail)
+  # For cohort mode with batch_size=8: export_shapes=2 exports 2 shapes × (steps/save_every) files
+  export_shapes: 2
+
+  # Which shapes to export: "sequential" | "random"
+  # - sequential: always export shapes 0, 1, ..., export_shapes-1
+  # - random: export random shapes each save_every (uses seed for reproducibility)
+  # Use sequential for consistent tracking; use random to see variety
+  export_strategy: sequential

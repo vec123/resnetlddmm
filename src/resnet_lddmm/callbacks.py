@@ -4,7 +4,7 @@ import torch
 
 from src.learning.callbacks.base import Callback
 from src.resnet_lddmm.diagnostics import jacobian_determinants, triangle_flips, lipschitz_bound
-from src.resnet_lddmm.io import export_trajectory
+from src.resnet_lddmm.io import export_trajectory, export_reference_shapes
 
 
 class TrajectoryExporter(Callback):
@@ -65,6 +65,12 @@ class TrajectoryExporter(Callback):
                 else:  # sequential
                     shape_indices = list(range(num_to_export))
 
+            # Export reference shapes (source and target) once per step to base directory
+            try:
+                export_reference_shapes(source, target, self.transform, base_out_dir)
+            except Exception as e:
+                print(f"[TrajectoryExporter] Reference shape export failed: {e}")
+
             # Export forward trajectory for selected shapes
             for shape_idx in shape_indices:
                 # Slice trajectory to single shape: [K+1, 1, N, 3]
@@ -80,8 +86,25 @@ class TrajectoryExporter(Callback):
                 export_trajectory(traj_slice, shape_faces, transform, fwd_dir)
             print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} forward trajectories")
 
-            # Export backward trajectory if bidirectional mode
+            # Export full forward trajectory if save_full is enabled
             stepper = ctx.stepper
+            mapping_error = stepper.mapping_error if hasattr(stepper, "mapping_error") else None
+            if mapping_error is not None and hasattr(mapping_error, "last_fwd_traj_full") and mapping_error.last_fwd_traj_full is not None:
+                traj_full = mapping_error.last_fwd_traj_full
+                for shape_idx in shape_indices:
+                    # Slice full trajectory to single shape: [K+1, 1, N, 3]
+                    traj_full_slice = type(traj_full)(
+                        points=traj_full.points[:, shape_idx:shape_idx+1, :, :],
+                        velocities=traj_full.velocities[:, shape_idx:shape_idx+1, :, :],
+                        dt=traj_full.dt
+                    )
+                    shape_faces = source_faces[shape_idx] if (isinstance(source_faces, list) and shape_idx < len(source_faces)) else source_faces
+                    fwd_full_dir = f"{base_out_dir}/forward_full/shape_{shape_idx}"
+                    print(f"[TrajectoryExporter] Exporting full forward trajectory (shape {shape_idx}) to {fwd_full_dir}")
+                    export_trajectory(traj_full_slice, shape_faces, transform, fwd_full_dir)
+                print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} full forward trajectories")
+
+            # Export backward trajectory if bidirectional mode
             if hasattr(stepper, "backward_traj") and stepper.backward_traj is not None:
                 bwd_traj = stepper.backward_traj
                 for shape_idx in shape_indices:
@@ -97,6 +120,22 @@ class TrajectoryExporter(Callback):
                     print(f"[TrajectoryExporter] Exporting backward trajectory (shape {shape_idx}) to {bwd_dir}")
                     export_trajectory(bwd_traj_slice, tgt_faces, transform, bwd_dir)
                 print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} backward trajectories")
+
+                # Export full backward trajectory if save_full is enabled
+                if mapping_error is not None and hasattr(mapping_error, "last_bwd_traj_full") and mapping_error.last_bwd_traj_full is not None:
+                    bwd_traj_full = mapping_error.last_bwd_traj_full
+                    for shape_idx in shape_indices:
+                        # Slice full backward trajectory: [K+1, 1, N, 3]
+                        bwd_traj_full_slice = type(bwd_traj_full)(
+                            points=bwd_traj_full.points[:, shape_idx:shape_idx+1, :, :],
+                            velocities=bwd_traj_full.velocities[:, shape_idx:shape_idx+1, :, :],
+                            dt=bwd_traj_full.dt
+                        )
+                        tgt_faces = target_faces[0] if (isinstance(target_faces, list) and len(target_faces) > 0) else target_faces
+                        bwd_full_dir = f"{base_out_dir}/backward_full/shape_{shape_idx}"
+                        print(f"[TrajectoryExporter] Exporting full backward trajectory (shape {shape_idx}) to {bwd_full_dir}")
+                        export_trajectory(bwd_traj_full_slice, tgt_faces, transform, bwd_full_dir)
+                    print(f"[TrajectoryExporter] Successfully exported {len(shape_indices)} full backward trajectories")
         except Exception as e:
             print(f"[TrajectoryExporter] Export failed: {e}")
             import traceback
@@ -126,6 +165,18 @@ class DiagnosticsCallback(Callback):
         traj = pred
         source, _ = batch
         faces = source.faces if hasattr(source, "faces") else None
+
+        # Log subsampling info
+        try:
+            stepper = ctx.stepper
+            mapping_error = stepper.mapping_error if hasattr(stepper, "mapping_error") else None
+            if mapping_error is not None:
+                if hasattr(mapping_error, "last_full_vertices") and mapping_error.last_full_vertices is not None:
+                    metrics["diag/vertices_full"] = float(mapping_error.last_full_vertices)
+                if hasattr(mapping_error, "last_subsample_vertices") and mapping_error.last_subsample_vertices is not None:
+                    metrics["diag/vertices_subsampled"] = float(mapping_error.last_subsample_vertices)
+        except Exception:
+            pass
 
         # Jacobian determinants: should be ≥ 0 (positive measure for diffeomorphism)
         try:

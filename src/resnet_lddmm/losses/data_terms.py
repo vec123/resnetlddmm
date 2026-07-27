@@ -480,48 +480,41 @@ class IsometryLoss(FlowTerm):
         for k in range(K):
             x = points[k]  # [B, N, 3]
 
-            # Process each batch and sampled point
-            for b in range(B):
-                for idx in indices:
-                    x_bn = x[b, idx:idx+1, :].clone()  # [1, 3]
-                    x_bn.requires_grad_(True)
+            # Gather sampled points from all batches: [B, n_sample, 3]
+            x_sampled = x[:, indices, :]
+            # Flatten to [B*n_sample, 3] for vectorized processing
+            x_sampled = x_sampled.reshape(-1, 3)
+            x_sampled.requires_grad_(True)
 
-                    # Create a wrapper for this point
-                    def field_fn(x_):
-                        return field(x_, code=None, step=k)
+            # Create a wrapper for this step
+            def field_fn(x_):
+                return field(x_, code=None, step=k)
 
-                    # Compute loss using jacobian
-                    if self.loss_type == "det":
-                        loss_bn = self._det_from_velocity(field_fn, x_bn)
-                    elif self.loss_type == "strain":
-                        loss_bn = self._strain_from_velocity(field_fn, x_bn)
-                    elif self.loss_type == "orthogonal":
-                        loss_bn = self._orthogonal_from_velocity(field_fn, x_bn)
+            # Compute loss for all sampled points at once (vectorized)
+            if self.loss_type == "det":
+                losses = self._det_from_velocity_batch(field_fn, x_sampled)
+            elif self.loss_type == "strain":
+                losses = self._strain_from_velocity_batch(field_fn, x_sampled)
+            elif self.loss_type == "orthogonal":
+                losses = self._orthogonal_from_velocity_batch(field_fn, x_sampled)
 
-                    all_losses.append(loss_bn)
+            all_losses.append(losses)
 
         # Compute final loss as mean of all point losses
-        return torch.stack(all_losses).mean()
+        return torch.cat(all_losses).mean()
 
     def _det_from_velocity(self, field_fn, x: Tensor) -> Tensor:
         """Compute det(J) by differentiating field output."""
         v = field_fn(x)  # [1, 3]
-
-        # Compute jacobian via finite differences without in-place ops
         eps = 1e-4
-        jac_cols = []
 
-        for j in range(3):
-            # Create perturbation tensor (non-in-place)
-            delta = torch.zeros_like(x)
-            delta[0, j] = eps
-            x_pert = x + delta
-            v_pert = field_fn(x_pert)
-            jac_col = (v_pert[0] - v[0]) / eps  # [3]
-            jac_cols.append(jac_col)
+        # Create all 3 perturbed points at once using identity matrix
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x + eps * eye  # [3, 3]
+        v_perturbed = field_fn(x_perturbed)  # [3, 3]
 
-        # Stack columns into jacobian: [3, 3]
-        jac = torch.stack(jac_cols, dim=1)
+        # Compute jacobian columns: (v_pert - v) / eps
+        jac = (v_perturbed - v) / eps  # [3, 3], each row is a jacobian column
 
         det_val = torch.det(jac)
         return (det_val - 1.0) ** 2
@@ -530,17 +523,14 @@ class IsometryLoss(FlowTerm):
         """Compute strain penalty via finite differences."""
         v = field_fn(x)  # [1, 3]
         eps = 1e-4
-        jac_cols = []
 
-        for j in range(3):
-            delta = torch.zeros_like(x)
-            delta[0, j] = eps
-            x_pert = x + delta
-            v_pert = field_fn(x_pert)
-            jac_col = (v_pert[0] - v[0]) / eps  # [3]
-            jac_cols.append(jac_col)
+        # Create all 3 perturbed points at once
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x + eps * eye  # [3, 3]
+        v_perturbed = field_fn(x_perturbed)  # [3, 3]
 
-        jac = torch.stack(jac_cols, dim=1)  # [3, 3]
+        # Compute jacobian: each row is a jacobian column
+        jac = (v_perturbed - v) / eps  # [3, 3]
         _, S, _ = torch.svd(jac)
         return torch.mean((S - 1.0) ** 2)
 
@@ -548,19 +538,95 @@ class IsometryLoss(FlowTerm):
         """Compute orthogonal penalty via finite differences."""
         v = field_fn(x)  # [1, 3]
         eps = 1e-4
-        jac_cols = []
 
-        for j in range(3):
-            delta = torch.zeros_like(x)
-            delta[0, j] = eps
-            x_pert = x + delta
-            v_pert = field_fn(x_pert)
-            jac_col = (v_pert[0] - v[0]) / eps  # [3]
-            jac_cols.append(jac_col)
+        # Create all 3 perturbed points at once
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x + eps * eye  # [3, 3]
+        v_perturbed = field_fn(x_perturbed)  # [3, 3]
 
-        jac = torch.stack(jac_cols, dim=1)  # [3, 3]
+        # Compute jacobian: each row is a jacobian column
+        jac = (v_perturbed - v) / eps  # [3, 3]
         U, _, Vt = torch.svd(jac)
         R = U @ Vt
         return torch.sum((jac - R) ** 2)
+
+    def _det_from_velocity_batch(self, field_fn, x: Tensor) -> Tensor:
+        """Compute det(J) by differentiating field output (vectorized for batch).
+
+        Args:
+            x: [N, 3] points
+        Returns:
+            [N] loss values
+        """
+        v = field_fn(x)  # [N, 3]
+        eps = 1e-4
+        N = x.shape[0]
+
+        # Create all 3 perturbed points at once: [N, 3, 3]
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x[:, None, :] + eps * eye[None, :, :]  # [N, 3, 3]
+
+        # Flatten to [N*3, 3], call field_fn, reshape back
+        x_flat = x_perturbed.reshape(-1, 3)  # [N*3, 3]
+        v_flat = field_fn(x_flat)  # [N*3, 3]
+        v_perturbed = v_flat.reshape(N, 3, 3)  # [N, 3, 3]
+
+        # Compute jacobians: (v_pert - v) / eps, shape [N, 3, 3]
+        jac = (v_perturbed - v[:, None, :]) / eps
+        det_vals = torch.det(jac)  # [N]
+        return (det_vals - 1.0) ** 2
+
+    def _strain_from_velocity_batch(self, field_fn, x: Tensor) -> Tensor:
+        """Compute strain penalty via finite differences (vectorized for batch).
+
+        Args:
+            x: [N, 3] points
+        Returns:
+            [N] loss values
+        """
+        v = field_fn(x)  # [N, 3]
+        eps = 1e-4
+        N = x.shape[0]
+
+        # Create all 3 perturbed points at once: [N, 3, 3]
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x[:, None, :] + eps * eye[None, :, :]  # [N, 3, 3]
+
+        # Flatten to [N*3, 3], call field_fn, reshape back
+        x_flat = x_perturbed.reshape(-1, 3)  # [N*3, 3]
+        v_flat = field_fn(x_flat)  # [N*3, 3]
+        v_perturbed = v_flat.reshape(N, 3, 3)  # [N, 3, 3]
+
+        # Compute jacobians: (v_pert - v) / eps, shape [N, 3, 3]
+        jac = (v_perturbed - v[:, None, :]) / eps
+        _, S, _ = torch.svd(jac)  # S: [N, 3]
+        return torch.mean((S - 1.0) ** 2, dim=1)  # [N]
+
+    def _orthogonal_from_velocity_batch(self, field_fn, x: Tensor) -> Tensor:
+        """Compute orthogonal penalty via finite differences (vectorized for batch).
+
+        Args:
+            x: [N, 3] points
+        Returns:
+            [N] loss values
+        """
+        v = field_fn(x)  # [N, 3]
+        eps = 1e-4
+        N = x.shape[0]
+
+        # Create all 3 perturbed points at once: [N, 3, 3]
+        eye = torch.eye(3, device=x.device, dtype=x.dtype)  # [3, 3]
+        x_perturbed = x[:, None, :] + eps * eye[None, :, :]  # [N, 3, 3]
+
+        # Flatten to [N*3, 3], call field_fn, reshape back
+        x_flat = x_perturbed.reshape(-1, 3)  # [N*3, 3]
+        v_flat = field_fn(x_flat)  # [N*3, 3]
+        v_perturbed = v_flat.reshape(N, 3, 3)  # [N, 3, 3]
+
+        # Compute jacobians: (v_pert - v) / eps, shape [N, 3, 3]
+        jac = (v_perturbed - v[:, None, :]) / eps
+        U, _, Vt = torch.svd(jac)
+        R = U @ Vt
+        return torch.sum((jac - R) ** 2, dim=(1, 2))  # [N]
 
 

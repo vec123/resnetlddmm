@@ -2,9 +2,9 @@
 # Registers two copies of the hand template (same geometry, tests correctness)
 # Use as template: adjust source/target paths and output_dir for your data
 
-source: data/hand/template.vtp
-target: data/hand/target_3.vtp
-output_dir: ./outputs/hand_pair_poc_target_3_bidir_iso
+source: data/hand/cohort
+target: data/hand/template.vtp
+output_dir: ./outputs/hand_pair_cohort_poc
 
 # Field: velocity field (time_varying or stationary)
 # For stationary: use kind: stationary (same f(x) at all time steps; use num_steps for integration steps)
@@ -16,26 +16,32 @@ field:
 
 # Code: no additional shape code (registration only)
 code:
-  kind: none
+  kind: auto_decoder
+  n_z: 256
+  conditioning: position_aware
+  grid: 5
+  grid_channels: 32
+
 
 
 # Loss: EMD (Earth Mover's Distance) for articulated shapes + kinetic energy
 loss:
   data_name: chamfer
   data_kwargs: {}
-    #p: 2
-   # blur: 0.01
-   # backend: auto
+  #p: 2
+   #blur: 0.01
+   #backend: auto
   direction: bidirectional
   sigma: 0.0002
   kinetic_weight: 0.005
   code_reg_weight: 0.0
-  isometry_weight: 10.0
+  isometry_weight: 0.0
   isometry_type: det
+  save_full: false
 
 # Training: 500 steps with Adam at lr=1e-4, seed for reproducibility
 train:
-  mode: pair
+  mode: cohort
   steps: 3001
   lr: 0.0001
   seed: 42

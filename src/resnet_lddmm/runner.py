@@ -80,15 +80,40 @@ def build(cfg: ExperimentCfg):
     seed_everything(cfg.train.seed)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
+    # Build conditioning (shared across pair/cohort)
+    # Orthogonal axes: position_aware (grid interpolation or broadcast?)
+    #                  + conditioning_method (concat or FiLM modulation?)
+    conditioning = None
+    if cfg.code.kind != "none":
+        # Build conditioning based on position_aware + conditioning_method
+        if cfg.code.position_aware:
+            conditioning = Registry.create(
+                "conditioning", "position_aware",
+                n_z=cfg.code.n_z,
+                g=cfg.code.grid,
+                channels=cfg.code.grid_channels
+            )
+        else:
+            # Broadcast-based conditioning (concat or FiLM)
+            conditioning = Registry.create(
+                "conditioning", cfg.code.conditioning_method,
+                n_z=cfg.code.n_z
+            )
+
     # Registry.create: field and integrators (shared across pair/cohort)
     if cfg.field.kind == "stationary":
-        field = Registry.create("field", "stationary", activation=cfg.field.activation)
+        field = Registry.create(
+            "field", "stationary",
+            activation=cfg.field.activation,
+            conditioning=conditioning
+        )
     else:
         field = Registry.create(
             "field", cfg.field.kind,
             num_blocks=cfg.field.num_steps,
             width=cfg.field.width,
-            activation=cfg.field.activation
+            activation=cfg.field.activation,
+            conditioning=conditioning
         )
     integrator_direct = ForwardEuler()
     integrator_inverse = ModifiedEuler()
@@ -122,27 +147,27 @@ def build(cfg: ExperimentCfg):
     ]
     composer = LossComposer(terms)
 
-    # Create mapping error strategy (shared)
-    subsample_n = cfg.loss.subsample_M if cfg.loss.subsample_M > 0 else None
-    if cfg.loss.direction == "bidirectional":
-        mapping_error = BidirectionalMappingError(subsample_pred_n=subsample_n)
-    else:  # default to forward
-        mapping_error = UnidirectionalMappingError(subsample_pred_n=subsample_n)
-
-    # Branch on training mode
+    # Branch on training mode (mapping_error created after loading shapes)
     if cfg.train.mode == "cohort":
-        return _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss)
+        return _build_cohort(cfg, flow, data_term, composer, iso_loss)
     else:
-        return _build_pair(cfg, flow, data_term, mapping_error, composer, iso_loss)
+        return _build_pair(cfg, flow, data_term, composer, iso_loss)
 
 
-def _build_pair(cfg, flow, data_term, mapping_error, composer, iso_loss):
+def _build_pair(cfg, flow, data_term, composer, iso_loss):
     """Build PairRegistration stepper."""
     # Load and normalize shapes
     source_shape = load_shape(cfg.source)
     target_shape = load_shape(cfg.target)
     normalized, transform = joint_normalize([source_shape, target_shape])
     source_norm, target_norm = normalized
+
+    # Create mapping error strategy after knowing source size
+    subsample_n = cfg.loss.resolve_subsample_count(source_norm.points.shape[1])
+    if cfg.loss.direction == "bidirectional":
+        mapping_error = BidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
+    else:  # default to forward
+        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
 
     # Create loader with normalized shapes
     class SimpleBatch:
@@ -168,13 +193,14 @@ def _build_pair(cfg, flow, data_term, mapping_error, composer, iso_loss):
     return stepper, loader, transform
 
 
-def _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss):
+def _build_cohort(cfg, flow, data_term, composer, iso_loss):
     """Build CohortRegistration stepper."""
     # Load all cohort shapes from directory
     cohort_paths = sorted(glob.glob(os.path.join(cfg.source, "*.obj"))) + \
-                   sorted(glob.glob(os.path.join(cfg.source, "*.ply")))
+                   sorted(glob.glob(os.path.join(cfg.source, "*.ply"))) + \
+                   sorted(glob.glob(os.path.join(cfg.source, "*.vtp")))
     if not cohort_paths:
-        raise ValueError(f"No shape files found in {cfg.source}")
+        raise ValueError(f"No shape files found in {cfg.source} (.obj, .ply, or .vtp)")
 
     cohort_shapes = [load_shape(p) for p in cohort_paths]
     target_shape = load_shape(cfg.target)
@@ -183,6 +209,13 @@ def _build_cohort(cfg, flow, data_term, mapping_error, composer, iso_loss):
     normalized, transform = joint_normalize(cohort_shapes + [target_shape])
     cohort_norm = normalized[:-1]
     target_norm = normalized[-1]
+
+    # Create mapping error strategy after knowing source size (use first shape)
+    subsample_n = cfg.loss.resolve_subsample_count(cohort_norm[0].points.shape[1])
+    if cfg.loss.direction == "bidirectional":
+        mapping_error = BidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
+    else:  # default to forward
+        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
 
     # Create loader for cohort
     loader = CohortBatchLoader(cohort_norm, target_norm, batch_size=cfg.train.batch)
