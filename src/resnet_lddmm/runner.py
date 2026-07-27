@@ -106,7 +106,11 @@ def build(cfg: ExperimentCfg):
         "data_term", cfg.loss.data_name,
         **cfg.loss.data_kwargs
     )
-    iso_loss = Registry.create("iso_loss", "isometry", **cfg.loss.iso_kwargs) if cfg.loss.isometry_weight > 0 else None
+    iso_loss = Registry.create(
+        "iso_loss", "isometry",
+        loss_type=cfg.loss.isometry_type,
+        sample_points=cfg.loss.isometry_samples
+    ) if cfg.loss.isometry_weight > 0 else None
 
     # Build loss composer (shared)
     data_weight = 1.0 / (2 * cfg.loss.sigma**2)

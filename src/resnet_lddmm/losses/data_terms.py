@@ -295,27 +295,24 @@ class NCDData(DataTerm):
         pred_to_tgt_indices = dist_sq.min(dim=2)[1]  # [B, N]
         pred_to_tgt_dists = dist_sq.min(dim=2)[0]  # [B, N]
 
-        # For normal penalty, compute alignment with nearest target normal
-        normal_penalty = torch.tensor(0.0, dtype=pred.dtype, device=pred.device)
+        # Vectorized normal penalty: gather directions and normals, compute dot products in parallel
+        # direction: [B, N, 3] - vector from target to pred
+        b_idx = torch.arange(B, device=pred.device).unsqueeze(1)  # [B, 1]
+        n_idx = torch.arange(N, device=pred.device).unsqueeze(0)  # [1, N]
+        direction = dist_vec[b_idx, n_idx, pred_to_tgt_indices]  # [B, N, 3]
 
-        for b in range(B):
-            for n in range(N):
-                m_idx = pred_to_tgt_indices[b, n]
-                direction = dist_vec[b, n, m_idx]  # [3], points from target to pred
-                normal = normals[b, m_idx]  # [3], should point away from pred
+        # normal: [B, N, 3] - normals at nearest target points
+        normal = normals[b_idx, pred_to_tgt_indices]  # [B, N, 3]
 
-                # Normalize for stable dot product
-                dir_norm = torch.norm(direction) + 1e-8
-                normal_norm = torch.norm(normal) + 1e-8
-                direction_normalized = direction / dir_norm
-                normal_normalized = normal / normal_norm
+        # Normalize both
+        dir_norm = torch.norm(direction, dim=-1, keepdim=True) + 1e-8  # [B, N, 1]
+        normal_norm = torch.norm(normal, dim=-1, keepdim=True) + 1e-8  # [B, N, 1]
+        direction_normalized = direction / dir_norm  # [B, N, 3]
+        normal_normalized = normal / normal_norm  # [B, N, 3]
 
-                # Penalty: max(0, direction · normal) penalizes when normal points towards pred
-                # We want normal to point AWAY from pred, so dot product should be negative
-                dot_product = torch.dot(direction_normalized, normal_normalized)
-                normal_penalty = normal_penalty + torch.clamp(dot_product, min=0.0)
-
-        normal_penalty = normal_penalty / (B * N) if B * N > 0 else normal_penalty
+        # Compute dot products and penalty
+        dot_products = (direction_normalized * normal_normalized).sum(dim=-1)  # [B, N]
+        normal_penalty = torch.clamp(dot_products, min=0.0).mean()  # scalar
 
         # Term 1: pred → target (point distance + normal penalty)
         term1 = (pred_to_tgt_dists.mean() + self.normal_weight * normal_penalty)
@@ -567,49 +564,3 @@ class IsometryLoss(FlowTerm):
         return torch.sum((jac - R) ** 2)
 
 
-    def _strain_loss(self, jacobians: Tensor) -> Tensor:
-        """Penalize singular values deviating from 1 (stretch/compression).
-
-        jacobians: [K, B, N, 3, 3]
-        """
-        K = jacobians.shape[0]
-        B = jacobians.shape[1]
-        N = jacobians.shape[2]
-        jacobians_flat = jacobians.reshape(K * B * N, 3, 3)
-
-        # Compute singular values via SVD
-        _, S, _ = torch.svd(jacobians_flat)  # S: [K*B*N, 3]
-
-        return torch.mean((S - 1.0) ** 2)
-
-    def _det_loss(self, jacobians: Tensor) -> Tensor:
-        """Penalize determinant deviating from 1 (volume change).
-
-        jacobians: [K, B, N, 3, 3]
-        """
-        K = jacobians.shape[0]
-        B = jacobians.shape[1]
-        N = jacobians.shape[2]
-        jacobians_flat = jacobians.reshape(K * B * N, 3, 3)
-
-        det_j = torch.det(jacobians_flat)  # [K*B*N]
-
-        return torch.mean((det_j - 1.0) ** 2)
-
-    def _orthogonal_loss(self, jacobians: Tensor) -> Tensor:
-        """Penalize Jacobian deviating from orthogonal (rigid maps).
-
-        Finds nearest orthogonal matrix R via Procrustes and measures ||J - R||_F^2.
-        jacobians: [K, B, N, 3, 3]
-        """
-        K = jacobians.shape[0]
-        B = jacobians.shape[1]
-        N = jacobians.shape[2]
-        jacobians_flat = jacobians.reshape(K * B * N, 3, 3)
-
-        # Nearest orthogonal matrix via SVD: R = U @ V^T
-        U, _, Vt = torch.svd(jacobians_flat)
-        R_closest = U @ Vt  # [K*B*N, 3, 3]
-
-        # Frobenius norm of difference
-        return torch.mean(torch.sum((jacobians_flat - R_closest) ** 2, dim=(1, 2)))

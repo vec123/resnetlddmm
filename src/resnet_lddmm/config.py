@@ -31,19 +31,16 @@ class LossCfg:
     kinetic_weight: float = 1.0
     code_reg_weight: float = 0.0
     weight_decay: float = 0.0               # Θ only — see Phase 6
-    isometry_weight: float = 0.0  # ← disabled by default
-    isometry_type: str = "strain"  # or "det" / "orthogonal"
-    isometry_samples: int = 64  # points per step for isometry (64 = ~5x speedup)
-    iso_kwargs: dict = dataclass_field(default_factory=lambda: {"loss_type": "strain", "sample_points": 64})
-    subsample_M: int = 2000                 # adaptive subsample target size (T28); 0 = disabled
-    subsample_a: float = 0.15               # fraction of hard examples to keep (T28)
+    isometry_weight: float = 0.0            # disabled by default
+    isometry_type: str = "strain"           # or "det" / "orthogonal"
+    isometry_samples: int = 64              # points per step for isometry (64 = ~5x speedup)
+    subsample_M: int = 2000                 # random subsample pred to N points; 0 = disabled
 
 @dataclass
 class TrainCfg:
     mode: str = "pair"                      # pair | cohort
     steps: int = 2000
     batch: int = 8
-    subsample: int = 0                      # M; 0 = all points
     lr: float = 1e-4
     seed: Optional[int] = None
     log_every: int = 50
