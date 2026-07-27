@@ -10,12 +10,6 @@ from src.learning.losses.losses import chamfer_loss
 from src.resnet_lddmm.trajectory import Trajectory
 from src.resnet_lddmm.fields.base import VelocityField
 
-try:
-    import geomloss
-    HAS_GEOMLOSS = True
-except ImportError:
-    HAS_GEOMLOSS = False
-
 
 class RegistrationLoss(nn.Module, abc.ABC):
     """Abstract base for all registration loss terms.
@@ -337,30 +331,45 @@ class NCDData(DataTerm):
         return term1 + term2
 
 
-class EMDData(DataTerm):
-    """Earth Mover's Distance via Sinkhorn's algorithm (geomloss).
+class SinkhornData(DataTerm):
+    """Sinkhorn optimal transport distance via geomloss (T34).
 
+    Solves the optimal transport problem using Sinkhorn's algorithm.
     Recommended for articulated shapes (e.g., hands) where Chamfer can
-    produce incorrect finger-to-finger matchings. Solves optimal transport
-    problem: min over permutations of sum of pairwise distances.
+    produce incorrect finger-to-finger matchings.
+
+    Lazy-loads geomloss: auto-decoder configs work even without it installed.
     """
 
-    def __init__(self, p: float = 2, blur: float = 0.01, backend: str = "auto"):
-        """Initialize EMD loss.
+    def __init__(self, p: float = 2, blur: float = 0.01, backend: str = "auto", **kwargs):
+        """Initialize Sinkhorn loss.
 
         Args:
             p: Distance norm (default 2 for L2)
             blur: Sinkhorn blur radius (higher = smoother gradient, default 0.01)
             backend: geomloss backend ("auto", "keops", "torch", default "auto")
+            **kwargs: ignored (compatibility with other data terms)
         """
         super().__init__()
-        if not HAS_GEOMLOSS:
-            raise ImportError(
-                "geomloss required for EMD. Install with: pip install geomloss"
+        self.p = p
+        self.blur = blur
+        self.backend = backend
+        self.loss_fn = None  # Lazy initialized
+
+    def _get_loss_fn(self):
+        """Lazy-load geomloss on first call."""
+        if self.loss_fn is None:
+            try:
+                import geomloss
+            except ImportError:
+                raise ImportError(
+                    "geomloss required for Sinkhorn distance. "
+                    "Install with: pip install geomloss"
+                )
+            self.loss_fn = geomloss.SamplesLoss(
+                "sinkhorn", p=self.p, blur=self.blur, backend=self.backend
             )
-        self.loss_fn = geomloss.SamplesLoss(
-            "sinkhorn", p=p, blur=blur, backend=backend
-        )
+        return self.loss_fn
 
     def forward(
         self,
@@ -370,7 +379,7 @@ class EMDData(DataTerm):
         tgt_w: Optional[Tensor] = None,
         normals: Optional[Tensor] = None,
     ) -> Tensor:
-        """Compute Earth Mover's Distance via Sinkhorn.
+        """Compute Sinkhorn optimal transport distance.
 
         Args:
             pred: [B, N, 3] predicted point positions
@@ -380,8 +389,10 @@ class EMDData(DataTerm):
             normals: ignored (kept for protocol compatibility)
 
         Returns:
-            Scalar EMD loss
+            Scalar Sinkhorn loss
         """
+        loss_fn = self._get_loss_fn()
+
         B, N, D = pred.shape
         B_tgt, M, D = target.shape
         assert B == B_tgt, f"Batch size mismatch: {B} vs {B_tgt}"
@@ -392,7 +403,7 @@ class EMDData(DataTerm):
             t_b = target[b]  # [M, 3]
 
             # Compute Sinkhorn loss; weights can be None
-            loss_b = self.loss_fn(
+            loss_b = loss_fn(
                 pred_w[b] if pred_w is not None else torch.ones(N, device=pred.device),
                 p_b,
                 tgt_w[b] if tgt_w is not None else torch.ones(M, device=target.device),
@@ -401,6 +412,29 @@ class EMDData(DataTerm):
             loss_total = loss_total + loss_b
 
         return loss_total / B
+
+
+class EMDData(DataTerm):
+    """Earth Mover's Distance via Sinkhorn's algorithm (legacy alias for SinkhornData).
+
+    Deprecated: use SinkhornData instead. Kept for backward compatibility.
+    """
+
+    def __init__(self, p: float = 2, blur: float = 0.01, backend: str = "auto"):
+        """Initialize EMD loss (delegates to SinkhornData)."""
+        super().__init__()
+        self._sinkhorn = SinkhornData(p=p, blur=blur, backend=backend)
+
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        pred_w: Optional[Tensor] = None,
+        tgt_w: Optional[Tensor] = None,
+        normals: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Compute Earth Mover's Distance via Sinkhorn."""
+        return self._sinkhorn(pred, target, pred_w=pred_w, tgt_w=tgt_w, normals=normals)
 
 
 class FlowTerm(RegistrationLoss):

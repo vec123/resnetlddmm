@@ -3,7 +3,7 @@
 import torch
 import pytest
 from src.resnet_lddmm.losses.data_terms import (
-    DataTerm, CDData, L2Data, WeightedCDData, PCDData, NCDData
+    DataTerm, CDData, L2Data, WeightedCDData, PCDData, NCDData, SinkhornData, EMDData
 )
 
 
@@ -644,3 +644,200 @@ class TestNCDDataWithNormals:
 
         losses = term(pred, target, normals=normals, per_point=True)
         assert losses.shape == (1, 10)
+
+
+def _has_geomloss():
+    """Check if geomloss is available."""
+    try:
+        import geomloss  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+class TestSinkhornDataBasics:
+    """Tests for SinkhornData (T34)."""
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_is_data_term(self):
+        """Verify SinkhornData is a DataTerm."""
+        assert issubclass(SinkhornData, DataTerm)
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_instantiation(self):
+        """Verify SinkhornData can be instantiated."""
+        term = SinkhornData()
+        assert callable(term)
+        assert term.p == 2
+        assert term.blur == 0.01
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_returns_scalar(self):
+        """Verify SinkhornData returns a scalar tensor."""
+        term = SinkhornData()
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 5, 3)
+
+        loss = term(pred, target)
+        assert loss.shape == ()
+        assert loss.dtype == torch.float32
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_zero_on_identical(self):
+        """Verify SinkhornData is nearly zero on identical clouds."""
+        term = SinkhornData()
+        cloud = torch.randn(1, 10, 3)
+
+        loss = term(cloud, cloud)
+        # Sinkhorn may not be exactly zero due to numerical precision
+        assert loss.item() < 1e-5
+
+
+class TestSinkhornDataLazyLoading:
+    """Test lazy loading of geomloss in SinkhornData."""
+
+    def test_sinkhorn_lazy_loads_geomloss(self):
+        """Verify geomloss is not loaded until forward() is called."""
+        term = SinkhornData()
+        # At init time, loss_fn should be None
+        assert term.loss_fn is None
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_loads_geomloss_on_forward(self):
+        """Verify geomloss is loaded on first forward call."""
+        term = SinkhornData()
+        assert term.loss_fn is None
+
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 5, 3)
+        loss = term(pred, target)
+
+        # After forward, loss_fn should be initialized
+        assert term.loss_fn is not None
+
+    @pytest.mark.skipif(_has_geomloss(), reason="geomloss is available (test requires absence)")
+    def test_sinkhorn_raises_without_geomloss(self):
+        """Verify SinkhornData raises ImportError if geomloss not available."""
+        term = SinkhornData()
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 5, 3)
+
+        with pytest.raises(ImportError, match="geomloss required"):
+            term(pred, target)
+
+
+class TestSinkhornDataWeights:
+    """Test SinkhornData with weights."""
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_with_weights(self):
+        """Verify SinkhornData accepts weight arguments."""
+        term = SinkhornData()
+        pred = torch.randn(1, 5, 3)
+        target = torch.randn(1, 5, 3)
+        pred_w = torch.ones(1, 5)
+        tgt_w = torch.ones(1, 5)
+
+        loss = term(pred, target, pred_w=pred_w, tgt_w=tgt_w)
+        assert loss.shape == ()
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_uniform_weights_vs_no_weights(self):
+        """Verify uniform weights give same loss as no weights."""
+        term = SinkhornData()
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 10, 3)
+
+        loss_no_w = term(pred, target)
+        w = torch.ones_like(pred[..., 0])
+        loss_with_w = term(pred, target, pred_w=w, tgt_w=w)
+
+        # Should be very close (may differ slightly due to Sinkhorn numerical issues)
+        assert torch.allclose(loss_no_w, loss_with_w, atol=1e-4)
+
+
+class TestSinkhornDataInitArgs:
+    """Test SinkhornData initialization arguments."""
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_custom_p(self):
+        """Verify SinkhornData accepts custom p norm."""
+        term = SinkhornData(p=1)
+        assert term.p == 1
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_custom_blur(self):
+        """Verify SinkhornData accepts custom blur."""
+        term = SinkhornData(blur=0.05)
+        assert term.blur == 0.05
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_sinkhorn_custom_backend(self):
+        """Verify SinkhornData accepts custom backend."""
+        term = SinkhornData(backend="torch")
+        assert term.backend == "torch"
+
+
+class TestEMDDataBackwardCompat:
+    """Test EMDData backward compatibility with SinkhornData."""
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_emddata_is_data_term(self):
+        """Verify EMDData is still a DataTerm."""
+        assert issubclass(EMDData, DataTerm)
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_emddata_delegates_to_sinkhorn(self):
+        """Verify EMDData delegates to SinkhornData."""
+        emd = EMDData()
+        pred = torch.randn(1, 10, 3)
+        target = torch.randn(1, 10, 3)
+
+        loss = emd(pred, target)
+        assert loss.shape == ()
+        assert loss.dtype == torch.float32
+
+    @pytest.mark.skipif(not _has_geomloss(), reason="geomloss not available")
+    def test_emddata_zero_on_identical(self):
+        """Verify EMDData is nearly zero on identical clouds."""
+        emd = EMDData()
+        cloud = torch.randn(1, 10, 3)
+
+        loss = emd(cloud, cloud)
+        assert loss.item() < 1e-5
+
+
+class TestAutoDecoderWithoutGeomloss:
+    """Verify auto-decoder configs work without geomloss (T34 lazy-loading guarantee)."""
+
+    def test_chamfer_instantiation_without_geomloss(self):
+        """Verify CDData works regardless of geomloss availability."""
+        term = CDData()
+        assert callable(term)
+
+    def test_l2_instantiation_without_geomloss(self):
+        """Verify L2Data works regardless of geomloss availability."""
+        term = L2Data()
+        assert callable(term)
+
+    def test_weighted_cd_instantiation_without_geomloss(self):
+        """Verify WeightedCDData works regardless of geomloss availability."""
+        term = WeightedCDData()
+        assert callable(term)
+
+    def test_pcd_instantiation_without_geomloss(self):
+        """Verify PCDData works regardless of geomloss availability."""
+        term = PCDData()
+        assert callable(term)
+
+    def test_ncd_instantiation_without_geomloss(self):
+        """Verify NCDData works regardless of geomloss availability."""
+        term = NCDData()
+        assert callable(term)
+
+    def test_auto_decoder_codes_instantiation_without_geomloss(self):
+        """Verify AutoDecoderCodes can be imported without geomloss."""
+        # This should not raise even if geomloss is unavailable
+        from src.resnet_lddmm.codes.auto_decoder import AutoDecoderCodes
+        codes = AutoDecoderCodes(num_shapes=5, n_z=3)
+        assert hasattr(codes, 'forward')

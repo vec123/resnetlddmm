@@ -30,6 +30,9 @@ Registry.register("data_term", "weighted_chamfer", "src.resnet_lddmm.losses.data
 Registry.register("data_term", "pcd", "src.resnet_lddmm.losses.data_terms:PCDData")
 Registry.register("data_term", "ncd", "src.resnet_lddmm.losses.data_terms:NCDData")
 
+# STEPS T34: SinkhornData (lazy-loaded geomloss)
+Registry.register("data_term", "sinkhorn", "src.resnet_lddmm.losses.data_terms:SinkhornData")
+
 # STEPS T10: ShapeCode + NoCode
 Registry.register("code", "none", "src.resnet_lddmm.codes.none:NoCode")
 
