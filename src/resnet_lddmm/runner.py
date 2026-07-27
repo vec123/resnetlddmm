@@ -119,10 +119,11 @@ def build(cfg: ExperimentCfg):
     composer = LossComposer(terms)
 
     # Create mapping error strategy (shared)
+    subsample_n = cfg.loss.subsample_M if cfg.loss.subsample_M > 0 else None
     if cfg.loss.direction == "bidirectional":
-        mapping_error = BidirectionalMappingError()
+        mapping_error = BidirectionalMappingError(subsample_pred_n=subsample_n)
     else:  # default to forward
-        mapping_error = UnidirectionalMappingError()
+        mapping_error = UnidirectionalMappingError(subsample_pred_n=subsample_n)
 
     # Branch on training mode
     if cfg.train.mode == "cohort":
