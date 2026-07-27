@@ -1,0 +1,47 @@
+# Example: Encoder-based codes (minimal configuration)
+#
+# Trains a shared deformation field with amortized encoder-based shape codes.
+# Uses GroupEncoder to infer latent codes from shape geometry.
+#
+# Minimal configuration with default encoder and graph specs.
+# See example_encoder_full.yaml for complete configuration with custom layers.
+
+source: data/rabbit/cohort/
+target: data/rabbit/template.obj
+output_dir: outputs/example_encoder_minimal
+
+field:
+  kind: stationary
+  num_steps: 10
+  activation: relu
+  fa: [64, 64, 64]
+  df: [256, 256, 256, 256, 256]
+  fourier_n_e: 3
+
+code:
+  # Encoder-based codes: amortized embedding inference from shape
+  kind: encoder
+  n_z: 256
+  # encoder_config and graph_spec use defaults when not specified
+  # See example_encoder_full.yaml for customization
+
+loss:
+  data_name: chamfer
+  direction: bidirectional
+  sigma: 0.1
+  kinetic_weight: 1e-4
+  code_reg_weight: 0.0  # No regularization for encoder codes
+  weight_decay: 0.0
+  isometry_weight: 0.0
+  subsample_M: 2000
+
+train:
+  mode: cohort
+  steps: 2000
+  batch: 8
+  lr: 1e-3
+  seed: 42
+  log_every: 50
+  save_every: 500
+  export_shapes: 2
+  export_strategy: sequential

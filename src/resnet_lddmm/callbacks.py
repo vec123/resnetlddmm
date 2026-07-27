@@ -1,6 +1,8 @@
 """Diagnostics and export callbacks for ResNetLDDMM (STEP T20)."""
 
+import os
 import torch
+import numpy as np
 
 from src.learning.callbacks.base import Callback
 from src.resnet_lddmm.diagnostics import jacobian_determinants, triangle_flips, lipschitz_bound
@@ -204,3 +206,130 @@ class DiagnosticsCallback(Callback):
                 metrics["diag/lipschitz_bound"] = bound
         except Exception:
             pass
+
+
+class EncoderGraphLogger(Callback):
+    """Log encoder input graphs with node-type marking (full nodes vs supernodes).
+
+    When using EncoderCodes, saves the point cloud and graph structure that the
+    encoder receives at each logging step. Includes a point field "node_type" to
+    distinguish regular nodes (0) from supernodes (1).
+
+    Useful for debugging graph construction: visualize node density, dropout effects,
+    supernode placement, and graph connectivity.
+    """
+
+    def __init__(self, every_n_steps=100):
+        super().__init__(every_n_steps)
+        self._last_graph_cache = None
+        self._last_supergraph_cache = None
+
+    def on_step_end(self, ctx, step, metrics, batch, pred):
+        """Cache graph and log if due."""
+        if pred is None:
+            return
+
+        # Store references for potential use in on_log or explicit export
+        stepper = ctx.stepper
+        if hasattr(stepper, "code_source"):
+            code_source = stepper.code_source
+            # Check if this is an encoder (has graph_builder and encoder)
+            if hasattr(code_source, "graph_builder") and hasattr(code_source, "_last"):
+                # Cache for potential use later
+                self._last_graph_cache = getattr(code_source, "_last_graph", None)
+                self._last_supergraph_cache = getattr(code_source, "_last_supergraph", None)
+
+        if not self._due(step):
+            return
+
+        # Export graph if available
+        self._export_encoder_graph(ctx, step)
+
+    def _export_encoder_graph(self, ctx, step):
+        """Export the last encoder graph with node-type marking."""
+        stepper = ctx.stepper
+        if not hasattr(stepper, "code_source"):
+            return
+
+        code_source = stepper.code_source
+
+        # Check if this is an encoder (has graph_builder)
+        if not hasattr(code_source, "graph_builder"):
+            return
+
+        # Try to get the cached graph (stored during forward pass)
+        graph = getattr(code_source, "_last_graph", None)
+        supergraph = getattr(code_source, "_last_supergraph", None)
+
+        if graph is None:
+            print(f"[EncoderGraphLogger] Step {step}: No graph cached (encoder not called yet)")
+            return
+
+        try:
+            # Create output directory
+            out_dir = f"{ctx.log_dir}/encoder_graphs/step_{step}"
+            os.makedirs(out_dir, exist_ok=True)
+
+            # Export full graph with node-type marking
+            self._export_graph_with_node_types(graph, supergraph, out_dir, "graph")
+
+            # Export supergraph separately if it exists
+            if supergraph is not None:
+                self._export_graph_with_node_types(supergraph, None, out_dir, "supergraph")
+
+            print(f"[EncoderGraphLogger] Exported encoder graph to {out_dir}")
+
+        except Exception as e:
+            print(f"[EncoderGraphLogger] Export failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _export_graph_with_node_types(self, graph, supergraph, out_dir, name):
+        """Export a PyG graph as VTP with node-type point field.
+
+        Args:
+            graph: PyG Data object with pos, batch, edge_index
+            supergraph: PyG Data object (supergraph) or None
+            out_dir: output directory
+            name: base filename (e.g. "graph" or "supergraph")
+        """
+        try:
+            from src.vtk.create import create_polydata
+            from src.vtk.fields import add_point_field
+            from src.vtk.io import save_vtp
+        except ImportError:
+            print(f"[EncoderGraphLogger] VTK utilities not available, skipping export")
+            return
+
+        pos = graph.pos.detach().cpu().numpy()
+        edge_index = graph.edge_index.detach().cpu().numpy()
+        batch = graph.batch.detach().cpu().numpy() if hasattr(graph, "batch") else np.zeros(pos.shape[0], dtype=np.int32)
+
+        # Determine node types:
+        # - Regular node: 0
+        # - Supernode: 1 (if this graph IS a supergraph, or points to supergraph nodes)
+        node_type = np.zeros(pos.shape[0], dtype=np.int32)
+
+        # If we have a supergraph, mark supernodes as type 1
+        if supergraph is not None:
+            n_supernodes = supergraph.pos.shape[0]
+            node_type[:n_supernodes] = 1
+
+        # Create polydata with points and edges as lines
+        polydata = create_polydata(pos, edge_index.T)
+
+        # Add node_type as point field
+        polydata = add_point_field(polydata, node_type, "node_type")
+
+        # Add batch index as point field (for multi-shape batches)
+        polydata = add_point_field(polydata, batch.astype(np.int32), "batch")
+
+        # Add area if available
+        if hasattr(graph, "area") and graph.area is not None:
+            area = graph.area.detach().cpu().numpy().flatten()
+            polydata = add_point_field(polydata, area.astype(np.float32), "area")
+
+        # Save to VTP
+        filepath = os.path.join(out_dir, f"{name}.vtp")
+        save_vtp(filepath, polydata)
+        print(f"[EncoderGraphLogger] Saved {name}: {pos.shape[0]} nodes, {edge_index.shape[1]} edges")

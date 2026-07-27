@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field as dataclass_field
-from typing import Optional
+from typing import Optional, List, Any
 
 
 @dataclass
@@ -21,6 +23,10 @@ class CodeCfg:
     conditioning_method: str = "concat"     # concat | film — how to apply features to velocity
     grid: int = 2                           # g — grid resolution (only if position_aware=True)
     grid_channels: int = 32                 # C — grid-head output per corner (only if position_aware=True)
+
+    # Encoder-specific config (only used if kind == "encoder")
+    encoder_config: Optional[EncoderConfig] = dataclass_field(default=None)
+    graph_spec: Optional[GraphSpec] = dataclass_field(default=None)
 
 
 @dataclass
@@ -80,16 +86,22 @@ class ExperimentCfg:
 
     @classmethod
     def from_dict(cls, d: dict) -> "ExperimentCfg":
-        """Create ExperimentCfg from dict, erroring on unknown keys."""
+        """Create ExperimentCfg from dict, erroring on unknown keys.
+
+        Handles nested config for encoder_config and graph_spec.
+        """
         allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "train"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
 
         field_cfg = FieldCfg(**d.get("field", {})) if "field" in d else FieldCfg()
-        code_cfg = CodeCfg(**d.get("code", {})) if "code" in d else CodeCfg()
         loss_cfg = LossCfg(**d.get("loss", {})) if "loss" in d else LossCfg()
         train_cfg = TrainCfg(**d.get("train", {})) if "train" in d else TrainCfg()
+
+        # Handle code config with special parsing for encoder_config and graph_spec
+        code_dict = d.get("code", {})
+        code_cfg = _parse_code_config(code_dict)
 
         return cls(
             source=d["source"],
@@ -100,3 +112,38 @@ class ExperimentCfg:
             loss=loss_cfg,
             train=train_cfg,
         )
+
+
+def _parse_code_config(code_dict: dict) -> CodeCfg:
+    """Parse code config, handling nested encoder_config and graph_spec.
+
+    Separates encoder/graph config from base code config and creates
+    EncoderConfig/GraphSpec objects when kind == "encoder".
+
+    Note: EncoderConfig/GraphSpec are only imported when needed (lazy import),
+    so basic config parsing doesn't require e3nn/torch_geometric.
+    """
+    # Extract nested configs before passing to CodeCfg
+    encoder_cfg_dict = code_dict.pop("encoder_config", {})
+    graph_cfg_dict = code_dict.pop("graph_spec", {})
+
+    # Parse encoder_config if provided and kind is encoder
+    encoder_cfg = None
+    if code_dict.get("kind") == "encoder":
+        from src.spec import EncoderConfig, EncoderLayerConfig
+        if encoder_cfg_dict:
+            # Parse layer configs
+            layers_data = encoder_cfg_dict.pop("layers", [])
+            layers = [EncoderLayerConfig(**layer) for layer in layers_data]
+            encoder_cfg = EncoderConfig(layers=layers, **encoder_cfg_dict)
+        else:
+            # Use default EncoderConfig
+            encoder_cfg = EncoderConfig()
+
+    # Parse graph_spec if provided and kind is encoder
+    graph_spec = None
+    if code_dict.get("kind") == "encoder":
+        from src.spec import GraphSpec
+        graph_spec = GraphSpec(**graph_cfg_dict) if graph_cfg_dict else GraphSpec()
+
+    return CodeCfg(encoder_config=encoder_cfg, graph_spec=graph_spec, **code_dict)

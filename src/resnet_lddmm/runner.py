@@ -27,7 +27,73 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger
+
+
+def _encoder_layers_to_list_of_dicts(encoder_config):
+    """Convert EncoderConfig.layers (dataclass objects) to list of dicts for Registry.create.
+
+    EncoderConfig stores layers as EncoderLayerConfig dataclass instances;
+    Registry.create(**kwargs) expects dicts to pass as kwargs to GroupEncoder.__init__.
+    """
+    return [
+        {
+            "in_irreps": layer.in_irreps,
+            "target_irreps": layer.target_irreps,
+            "spatial_sh_lmax": layer.spatial_sh_lmax,
+            "interaction_sh_lmax": layer.interaction_sh_lmax,
+        }
+        for layer in encoder_config.layers
+    ]
+
+
+def _build_encoder_code_source(encoder_config, graph_spec, n_z):
+    """Factory to instantiate EncoderCodes with graph builder and encoder.
+
+    Creates a GraphBuilder and GroupEncoder from spec/config, then wraps
+    in EncoderCodes for training. This is only called when code.kind == "encoder".
+
+    Args:
+        encoder_config: EncoderConfig instance (from spec.py)
+        graph_spec: GraphSpec instance (from spec.py)
+        n_z: latent dimension (int)
+
+    Returns:
+        EncoderCodes instance ready to use in training
+    """
+    if encoder_config is None:
+        raise ValueError("encoder_config required for code.kind='encoder'")
+    if graph_spec is None:
+        raise ValueError("graph_spec required for code.kind='encoder'")
+
+    # Create GraphBuilder
+    graph_builder = Registry.create("graph_builder", "radius", spec=graph_spec)
+
+    # Create GroupEncoder with layer specs from encoder_config
+    layers_as_dicts = _encoder_layers_to_list_of_dicts(encoder_config)
+    encoder = Registry.create(
+        "encoder", "group_encoder",
+        layers_cfg=layers_as_dicts,
+        latent_dim=n_z,
+        readout=encoder_config.readout,
+        readout_heads=encoder_config.readout_heads,
+        supernode_sh_lmax=encoder_config.supernode_sh_lmax,
+        transformer_type=encoder_config.transformer_type,
+        transformer_cfg=encoder_config.transformer_cfg,
+        area_pool=encoder_config.area_pool,
+        latent_mode=encoder_config.latent_mode,
+        verbose=encoder_config.verbose,
+    )
+
+    # Create EncoderCodes wrapping both
+    code_source = Registry.create(
+        "code", "encoder",
+        graph_builder=graph_builder,
+        encoder=encoder,
+        n_z=n_z,
+    )
+
+    return code_source
 
 
 class VerboseCallback(Callback):
@@ -83,8 +149,9 @@ def build(cfg: ExperimentCfg):
     # Build conditioning (shared across pair/cohort)
     # Orthogonal axes: position_aware (grid interpolation or broadcast?)
     #                  + conditioning_method (concat or FiLM modulation?)
+    # Note: encoder codes don't use conditioning (amortized embeddings from shape)
     conditioning = None
-    if cfg.code.kind != "none":
+    if cfg.code.kind not in ("none", "encoder"):
         # Build conditioning based on position_aware + conditioning_method
         if cfg.code.position_aware:
             conditioning = Registry.create(
@@ -154,6 +221,51 @@ def build(cfg: ExperimentCfg):
         return _build_pair(cfg, flow, data_term, composer, iso_loss)
 
 
+def _build_code_source(kind, code_cfg):
+    """Build a ShapeCode instance (none, auto_decoder, or encoder).
+
+    Args:
+        kind: "none" | "auto_decoder" | "encoder"
+        code_cfg: CodeCfg instance with all settings
+
+    Returns:
+        ShapeCode instance ready to use in training
+    """
+    if kind == "encoder":
+        return _build_encoder_code_source(
+            code_cfg.encoder_config,
+            code_cfg.graph_spec,
+            code_cfg.n_z
+        )
+    else:
+        # For "none" and "auto_decoder", use Registry with standard args
+        return Registry.create("code", kind)
+
+
+def _build_code_source_cohort(num_shapes, kind, code_cfg):
+    """Build a ShapeCode for cohort mode (auto_decoder and encoder need num_shapes).
+
+    Args:
+        num_shapes: number of shapes in cohort
+        kind: "none" | "auto_decoder" | "encoder"
+        code_cfg: CodeCfg instance with all settings
+
+    Returns:
+        ShapeCode instance ready to use in training
+    """
+    if kind == "encoder":
+        return _build_encoder_code_source(
+            code_cfg.encoder_config,
+            code_cfg.graph_spec,
+            code_cfg.n_z
+        )
+    elif kind == "auto_decoder":
+        return Registry.create("code", kind, num_shapes=num_shapes, n_z=code_cfg.n_z)
+    else:
+        # "none"
+        return Registry.create("code", kind)
+
+
 def _build_pair(cfg, flow, data_term, composer, iso_loss):
     """Build PairRegistration stepper."""
     # Load and normalize shapes
@@ -178,8 +290,8 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss):
 
     loader = OneBatchLoader((SimpleBatch(source_norm), SimpleBatch(target_norm)))
 
-    # Registry.create: code source
-    code_source = Registry.create("code", cfg.code.kind)
+    # Build code source (handles none, auto_decoder, encoder)
+    code_source = _build_code_source(cfg.code.kind, cfg.code)
 
     # Create optimizer (single param group)
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr, weight_decay=cfg.loss.weight_decay)
@@ -220,8 +332,8 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss):
     # Create loader for cohort
     loader = CohortBatchLoader(cohort_norm, target_norm, batch_size=cfg.train.batch)
 
-    # Registry.create: code source (must be AutoDecoderCodes for cohort)
-    code_source = Registry.create("code", cfg.code.kind, num_shapes=len(cohort_norm), n_z=cfg.code.n_z)
+    # Build code source (handles none, auto_decoder, encoder with cohort-specific logic)
+    code_source = _build_code_source_cohort(len(cohort_norm), cfg.code.kind, cfg.code)
 
     # Create optimizer with two param groups: flow with weight_decay, codes without
     optimizer = torch.optim.Adam([
@@ -304,6 +416,11 @@ def run(cfg: ExperimentCfg, callbacks=None):
     for cb in callbacks:
         if isinstance(cb, TrajectoryExporter):
             cb.transform = transform
+
+    # Add EncoderGraphLogger if using encoder
+    if cfg.code.kind == "encoder":
+        graph_log_cadence = getattr(cfg.train, 'save_every', 100)
+        callbacks.append(EncoderGraphLogger(every_n_steps=graph_log_cadence))
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,

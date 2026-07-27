@@ -19,8 +19,8 @@ code:
 
 loss:
   data_name: chamfer
-  sigma: 0.8
-  kinetic_weight: 5.0
+  sigma: 0.2
+  kinetic_weight: 0.0
   code_reg_weight: 0.0
   isometry_weight: 0.0
   isometry_type: det

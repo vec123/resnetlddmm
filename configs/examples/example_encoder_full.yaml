@@ -1,0 +1,124 @@
+# Example: Encoder-based codes (full configuration)
+#
+# Trains a shared deformation field with amortized encoder-based shape codes.
+# Demonstrates all encoder and graph configuration options.
+#
+# Key difference from auto_decoder:
+# - Encoder infers codes from shape geometry, enabling amortized training
+# - No per-shape embedding table needed (scalable to large cohorts)
+# - GraphBuilder + GroupEncoder instantiated automatically
+
+source: data/rabbit/cohort/
+target: data/rabbit/template.obj
+output_dir: outputs/example_encoder_full
+
+field:
+  kind: stationary
+  num_steps: 10
+  activation: relu
+  fa: [64, 64, 64]
+  df: [256, 256, 256, 256, 256]
+  fourier_n_e: 3
+
+code:
+  kind: encoder
+  n_z: 256
+
+  # ---- Encoder Configuration ----
+  encoder_config:
+    latent_dim: 256
+    readout: mean           # "mean" | "attention"
+    readout_heads: 1        # Only used if readout == "attention"
+    supernode_sh_lmax: 4    # Spherical harmonic degree for supernode conv
+    transformer_type: se3   # "se3" | "equiformer" | None
+    transformer_cfg: {}     # Transformer-specific kwargs (usually empty)
+    area_pool: false        # Weight by surface area when pooling
+    latent_mode: gaussian   # "gaussian" (VAE) | "deterministic" (AE)
+    verbose: false
+
+    # Equivariant layer stack: each layer's target_irreps must match next layer's in_irreps
+    # Irreps format: "NxIRREP" where IRREP is e.g. "0e", "1o", "0e+1o"
+    # Orders: L + parity (e=even, o=odd)
+    layers:
+      - in_irreps: "1x0e"   # Scalar node features (constant 1)
+        target_irreps: "32x0e + 32x0o + 16x1e + 16x1o"
+        spatial_sh_lmax: 1  # Spherical harmonics for spatial encoding (low cost)
+        interaction_sh_lmax: 4  # Interaction kernel degree (higher = more expressive)
+
+      - in_irreps: "32x0e + 32x0o + 16x1e + 16x1o"  # From previous layer
+        target_irreps: "64x0e + 32x0o + 32x1e + 16x1o"
+        spatial_sh_lmax: 2
+        interaction_sh_lmax: 4
+
+  # ---- Graph Construction Configuration ----
+  graph_spec:
+    # Node neighborhood radius (fixed or range for random sampling)
+    r_max: 0.1                      # Fixed: 0.1-neighborhood graph
+    # r_max: [0.08, 0.12]           # Range: uniformly sample per step
+
+    # Supernode aggregation radius (only if use_supernodes=True)
+    r_supergraph: 0.2
+
+    # Node dropout rate (fixed or range)
+    dropout_rate: 0.8               # Fixed: keep 20% of nodes
+    # dropout_rate: [0.7, 0.9]      # Range: uniformly sample per step
+
+    # Supernode aggregation (pooling layer for multi-scale encoding)
+    use_supernodes: false
+    n_supernodes: 10                # Number of supernode aggregation centers
+    sampling_mode_supernodes: fps   # "fps" | "uniform" | "gaussian"
+
+    # Node sampling strategy for graph construction
+    sampling_mode_graph: uniform    # "fps" | "uniform" | "gaussian"
+
+    # Per-vertex surface area estimation (for area-weighted pooling)
+    recompute_area: false           # Recompute from current (post-dropout) cloud
+    area_k: 8                        # k for k-NN area estimation
+
+    # Augmentation: noise added before graph construction
+    noise_std: 0.0                  # Gaussian noise stddev (0 = disabled)
+
+loss:
+  data_name: chamfer
+  direction: bidirectional
+  sigma: 0.1
+  kinetic_weight: 1e-4
+  code_reg_weight: 0.0  # Encoder codes have no regularization term
+  weight_decay: 0.0
+  isometry_weight: 0.0
+  isometry_type: strain
+  isometry_samples: 64
+  subsample_M: 2000
+
+train:
+  mode: cohort
+  steps: 2000
+  batch: 8
+  lr: 1e-3
+  seed: 42
+  log_every: 50
+  save_every: 500
+  val_every: 0
+  export_shapes: 2
+  export_strategy: sequential
+
+# ---- Design Notes ----
+# 1. Irreps (irreducible representations) form an equivariant algebra.
+#    "0e" = scalar (invariant), "1o" = 3D vector (pseudovector).
+#    GroupEncoder enforces output has exactly `latent_dim` scalars + 2 vectors.
+#
+# 2. r_max controls graph sparsity (lower = fewer edges, faster but sparser).
+#    dropout_rate thins the point cloud before graph building.
+#    Together they trade off between expressivity and computational cost.
+#
+# 3. Supernodes (when use_supernodes=True) add a second pooling tier,
+#    enabling multi-scale reasoning. Usually not needed for shapes < 10k vertices.
+#
+# 4. GraphBuilder with GraphSpec is instantiated automatically in runner.py.
+#    You don't need to write code; just configure the spec.
+#
+# 5. GroupEncoder's transformer_type is optional refinement after pooling.
+#    Set to None to skip; "se3" / "equiformer" select the backend.
+#
+# 6. latent_mode selects VAE (gaussian: mu/logvar) or AE (deterministic).
+#    Affects what .sample() returns in forward; both give [B, latent_dim].

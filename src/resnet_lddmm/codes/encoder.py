@@ -33,6 +33,8 @@ class EncoderCodes(ShapeCode):
         self.encoder = encoder
         self.n_z = n_z or encoder.latent_dim
         self._last = None  # Stores last EncoderOutput for pose access (T32)
+        self._last_graph = None  # Stores last graph for logging/visualization
+        self._last_supergraph = None  # Stores last supergraph for logging
 
     def forward(self, batch):
         """Extract codes via graph encoding.
@@ -71,6 +73,10 @@ class EncoderCodes(ShapeCode):
             points_flat, mask, rng,
             areas=weights, normals=normals
         )
+
+        # Cache graph for logging/visualization
+        self._last_graph = graph
+        self._last_supergraph = supergraph
 
         # Move graph to same device as points
         graph = graph.to(points.device)
