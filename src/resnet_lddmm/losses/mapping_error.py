@@ -66,11 +66,27 @@ class UnidirectionalMappingError:
         fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
         pred = fwd.end
+        print(f"[FLOW_DEBUG] after flow: pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
 
         # Apply encoder pose if provided (transforms pred to augmented frame for comparison)
         if encoder_pose is not None and (encoder_pose[0] is not None or encoder_pose[1] is not None):
             rotation, translation = encoder_pose
+            # For SO(3)-only training, skip translation (doesn't have requires_grad)
+            # to avoid breaking gradient flow. Translation will be enabled for SE(3) later.
+            if translation is not None and not translation.requires_grad:
+                translation = None
+
+            # CRITICAL: if rotation doesn't require grad, gradients won't flow back to encoder
+            print(f"[POSE_DEBUG] Before applying pose:")
+            print(f"  rotation: requires_grad={rotation.requires_grad if rotation is not None else 'N/A'}, grad_fn={rotation.grad_fn if rotation is not None else 'N/A'}")
+            print(f"  translation: requires_grad={translation.requires_grad if translation is not None else 'N/A'}, grad_fn={translation.grad_fn if translation is not None else 'N/A'}")
+            print(f"  pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
+
+            if rotation is not None and not rotation.requires_grad:
+                print(f"[GRADIENT_ERROR] rotation.requires_grad=False! This breaks gradient flow to encoder.")
+
             pred = self._apply_encoder_pose(pred, rotation, translation)
+            print(f"[POSE_DEBUG] After applying pose: pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
 
         # Optionally compute full trajectory for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
@@ -119,39 +135,28 @@ class UnidirectionalMappingError:
         """Apply SE(3) transformation: points_out = R @ points + t.
 
         Args:
-            points: [B, N, 3] or [B*N, 3]
+            points: [B, N, 3] batched points
             rotation: [B, 3, 3] or None
             translation: [B, 3] or None
 
         Returns:
-            [B, N, 3] or [B*N, 3] transformed points
+            [B, N, 3] transformed points
         """
-        is_batched = points.ndim == 3
-        if is_batched:
-            B, N, D = points.shape
-            flat_points = points.reshape(B * N, 3)
-        else:
-            flat_points = points
-
         if rotation is None and translation is None:
             return points
 
-        # Infer batch size from rotation if available
+        B, N, D = points.shape
+
+        # Apply rotation: einsum preserves gradients better than SE3_transform
+        # 'bij,bjk->bik' means: for each batch b, [N,3] @ [3,3] = [N,3]
         if rotation is not None:
-            B = rotation.shape[0]
-        else:
-            B = translation.shape[0]
+            points = torch.einsum('bij,bjk->bik', points, rotation)
 
-        n_node = torch.full((B,), flat_points.shape[0] // B, dtype=torch.long, device=points.device)
+        # Apply translation
+        if translation is not None:
+            points = points + translation.unsqueeze(1)  # [B,1,3] + [B,N,3]
 
-        rot = rotation if rotation is not None else torch.eye(3, device=points.device).unsqueeze(0).expand(B, -1, -1)
-        trans = translation if translation is not None else torch.zeros(B, 3, device=points.device)
-
-        transformed = SE3_transform(flat_points, n_node, rot, trans)
-
-        if is_batched:
-            transformed = transformed.reshape(B, N, 3)
-        return transformed
+        return points
 
 
 class BidirectionalMappingError:
@@ -185,7 +190,7 @@ class BidirectionalMappingError:
         self.last_fwd_traj_full = None  # Store full trajectories if save_full=True
         self.last_bwd_traj_full = None
 
-    def __call__(self, flow, data_term, template, sample, code) -> Tuple[Tensor, Tensor]:
+    def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
         """Compute bidirectional mapping error.
 
         Args:
@@ -194,6 +199,7 @@ class BidirectionalMappingError:
             template: batch with .points [B,N,3] (canonical reference)
             sample: batch with .points [B,M,3] (augmented input)
             code: [B, n_z] or None
+            encoder_pose: Optional (rotation [B,3,3], translation [B,3]) tuple, or None
 
         Returns:
             (data_loss, kinetic_energy) tuple where:
@@ -248,16 +254,56 @@ class BidirectionalMappingError:
             self.last_fwd_traj_full = None
             self.last_bwd_traj_full = None
 
+        # Apply encoder pose if provided (transforms endpoints to augmented frame for comparison)
+        fwd_end = fwd.end
+        bwd_end = bwd.end
+        if encoder_pose is not None and (encoder_pose[0] is not None or encoder_pose[1] is not None):
+            rotation, translation = encoder_pose
+            # For SO(3)-only training, skip translation to avoid breaking gradient flow
+            if translation is not None and not translation.requires_grad:
+                translation = None
+            fwd_end = self._apply_encoder_pose(fwd_end, rotation, translation)
+            bwd_end = self._apply_encoder_pose(bwd_end, rotation, translation)
+
         # Data term: forward distance + backward distance (both on subsampled points)
         data = (
-            data_term(fwd.end, sample_points, tgt_w=sample_weights)
-            + data_term(bwd.end, template_points, tgt_w=template_weights)
+            data_term(fwd_end, sample_points, tgt_w=sample_weights)
+            + data_term(bwd_end, template_points, tgt_w=template_weights)
         )
 
         # Kinetic energy: sum over both trajectories
         kinetic = fwd.kinetic_energy() + bwd.kinetic_energy()
 
         return data, kinetic
+
+    @staticmethod
+    def _apply_encoder_pose(points: Tensor, rotation: Optional[Tensor],
+                            translation: Optional[Tensor]) -> Tensor:
+        """Apply SE(3) transformation: points_out = R @ points + t.
+
+        Args:
+            points: [B, N, 3] batched points
+            rotation: [B, 3, 3] or None
+            translation: [B, 3] or None
+
+        Returns:
+            [B, N, 3] transformed points
+        """
+        if rotation is None and translation is None:
+            return points
+
+        B, N, D = points.shape
+
+        # Apply rotation: einsum preserves gradients better than SE3_transform
+        # 'bij,bjk->bik' means: for each batch b, [N,3] @ [3,3] = [N,3]
+        if rotation is not None:
+            points = torch.einsum('bij,bjk->bik', points, rotation)
+
+        # Apply translation
+        if translation is not None:
+            points = points + translation.unsqueeze(1)  # [B,1,3] + [B,N,3]
+
+        return points
 
     @staticmethod
     def _subsample_points(points: Tensor, n_subsample: int) -> Tensor:

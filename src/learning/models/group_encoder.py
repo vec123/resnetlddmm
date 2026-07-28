@@ -235,16 +235,28 @@ class GroupEncoder(nn.Module):
 
         # Extract v1, v2 for rotation matrix (2 vectors -> 3x3 R)
         v1, v2 = vec_graph[:, 0, :], vec_graph[:, 1, :]
+        v1_norm = v1.norm(dim=-1).mean().item()
+        v2_norm = v2.norm(dim=-1).mean().item()
+        print(f"[ENCODER_DEBUG] Rotation computation:")
+        print(f"  v1: requires_grad={v1.requires_grad}, grad_fn={v1.grad_fn}, norm={v1_norm:.6f}")
+        print(f"  v2: requires_grad={v2.requires_grad}, grad_fn={v2.grad_fn}, norm={v2_norm:.6f}")
         rot_matrix = self.get_rotation_matrix_from_two_vectors(v1, v2)
+        print(f"  rot_matrix: requires_grad={rot_matrix.requires_grad}, grad_fn={rot_matrix.grad_fn}")
 
         # Translation: center of mass (over the pooled token set). Area-weighted when
-        # areas are available -> the true surface centroid (a plain mean over-weights
-        # densely sampled regions).
-        if pool_area is not None:
+        # areas are available and differentiable -> the true surface centroid (a plain mean
+        # over-weights densely sampled regions). Falls back to unweighted mean if areas
+        # don't have gradients (e.g., SO(3)-only training).
+        # Skip translation for SO(3)-only mode to avoid breaking gradient flow
+        # (translation will be re-enabled for SE(3) training in the future)
+
+        if pool_area is not None and pool_area.requires_grad:
             denom = global_add_pool(pool_area, pool_batch, size=num_graphs).clamp_min(1e-12)
             transl = global_add_pool(pool_area * pool_pos, pool_batch, size=num_graphs) / denom
         else:
+            # Fall back to unweighted mean to preserve gradient flow
             transl = global_mean_pool(pool_pos, pool_batch, size=num_graphs)
+        print(f"[ENCODER_DEBUG] transl.requires_grad={transl.requires_grad}, transl.grad_fn={transl.grad_fn}")
         
         # Attach the pose to whatever latent fields the head produced, without this
         # method needing to know which kind of head it holds.
@@ -252,13 +264,39 @@ class GroupEncoder(nn.Module):
     
 
     def get_rotation_matrix_from_two_vectors(self, v1, v2):
-        u = v1 / (torch.norm(v1, dim=-1, keepdim=True) + 1e-8)
-        
-        # Gram-Schmidt
-        dot = torch.einsum('bi,bi->b', u, v2).unsqueeze(-1)
-        w_raw = v2 - dot * u
-        w = w_raw / (torch.norm(w_raw, dim=-1, keepdim=True) + 1e-8)
-        
-        # Cross product for 3rd basis vector
-        last_v = torch.cross(u, w, dim=-1)
-        return torch.stack([u, w, last_v], dim=-1)
+        """Compute rotation matrix from two vectors using QR decomposition (more stable than Gram-Schmidt).
+
+        Args:
+            v1: [B, 3] first vector
+            v2: [B, 3] second vector
+
+        Returns:
+            [B, 3, 3] rotation matrix with orthonormal columns
+        """
+        B = v1.shape[0]
+
+        # Stack v1, v2, and cross product to form a 3x3 matrix per batch
+        v3 = torch.cross(v1, v2, dim=-1)
+
+        # Create [B, 3, 3] matrix where each column is a vector
+        # Matrix is [v1 | v2 | v3] (column-wise stacking)
+        mat = torch.stack([v1, v2, v3], dim=-1)  # [B, 3, 3]
+
+        # Use QR decomposition to get orthonormal basis
+        # Q will be orthonormal (orthogonal matrix), R will be upper triangular
+        Q, R = torch.linalg.qr(mat)  # Q: [B, 3, 3], R: [B, 3, 3]
+
+        # Ensure det(Q) = 1 (proper rotation, not reflection)
+        det_Q = torch.det(Q)
+        # If det < 0, negate the last column to make it a proper rotation
+        sign_det = torch.sign(det_Q).unsqueeze(-1).unsqueeze(-1)  # [B, 1, 1]
+        Q = Q * sign_det
+
+        # Verify rotation matrix is orthonormal
+        if torch.isnan(Q).any() or torch.isinf(Q).any():
+            print(f"[ROT_ERROR] NaN/Inf in QR-computed rotation matrix!")
+            print(f"  v1 norm: {torch.norm(v1, dim=-1).mean().item():.6f}")
+            print(f"  v2 norm: {torch.norm(v2, dim=-1).mean().item():.6f}")
+            print(f"  v3 norm: {torch.norm(v3, dim=-1).mean().item():.6f}")
+
+        return Q

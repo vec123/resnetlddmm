@@ -27,7 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector
 
 
 def _encoder_layers_to_list_of_dicts(encoder_config):
@@ -236,9 +236,9 @@ def build(cfg: ExperimentCfg):
 
     # Branch on training mode (mapping_error created after loading shapes)
     if cfg.train.mode == "cohort":
-        return _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation)
+        return _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose)
     else:
-        return _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation)
+        return _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose)
 
 
 def _build_code_source(kind, code_cfg):
@@ -286,7 +286,7 @@ def _build_code_source_cohort(num_shapes, kind, code_cfg):
         return Registry.create("code", kind)
 
 
-def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation):
+def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False):
     """Build PairRegistration stepper."""
     # Load and normalize shapes
     source_shape = load_shape(cfg.source)
@@ -317,7 +317,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation):
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr, weight_decay=cfg.loss.weight_decay)
 
     # Create stepper
-    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation)
+    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose)
 
     # Dump config to output dir
     _dump_config(cfg, "pair")
@@ -325,7 +325,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation):
     return stepper, loader, transform
 
 
-def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation):
+def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False):
     """Build CohortRegistration stepper."""
     # Load all cohort shapes from directory
     cohort_paths = sorted(glob.glob(os.path.join(cfg.source, "*.obj"))) + \
@@ -362,7 +362,7 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation):
     ], lr=cfg.train.lr)
 
     # Create stepper
-    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation)
+    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose)
 
     # Dump config to output dir
     _dump_config(cfg, "cohort")
@@ -424,7 +424,9 @@ def run(cfg: ExperimentCfg, callbacks=None):
             export_rng = torch.Generator(device="cpu")
             export_rng.manual_seed(cfg.train.seed)
         callbacks = [
+            NetworkStructureInspector(),
             VerboseCallback(log_every=log_every),
+            GradientLogger(every_n_steps=log_every),
             TrajectoryExporter(every_n_steps=save_every, export_shapes=export_shapes,
                              export_strategy=export_strategy, rng=export_rng),
             DiagnosticsCallback(every_n_steps=save_every),

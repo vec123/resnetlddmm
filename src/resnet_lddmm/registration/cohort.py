@@ -16,7 +16,7 @@ class CohortRegistration:
     Implements the four-method protocol (state_dict, load_state_dict, train, eval).
     """
 
-    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None):
+    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None, use_encoder_pose=False):
         """Initialize the cohort registration stepper.
 
         Args:
@@ -28,6 +28,7 @@ class CohortRegistration:
             optimizer: torch optimizer with param groups [flow_params, code_params]
             iso_loss: IsometryLoss instance (optional)
             augmentation: Augmentation instance (optional; defaults to NoAugmentation)
+            use_encoder_pose: bool, whether to extract and apply encoder pose from code_source
         """
         self.flow = flow
         self.code_source = code_source
@@ -37,6 +38,7 @@ class CohortRegistration:
         self.optimizer = optimizer
         self.iso_loss = iso_loss
         self.augmentation = augmentation
+        self.use_encoder_pose = use_encoder_pose
         if self.augmentation is None:
             from src.resnet_lddmm.augmentation.none import NoAugmentation
             self.augmentation = NoAugmentation()
@@ -69,9 +71,20 @@ class CohortRegistration:
         self.augmented_sample_batch = augmented_sample_batch
 
         code = self.code_source(augmented_sample_batch)
+        print(f"[COHORT_DEBUG] After encoder: code.requires_grad={code.requires_grad}, grad_fn={code.grad_fn}")
+
+        # Extract encoder pose if enabled
+        encoder_pose = None
+        if self.use_encoder_pose and hasattr(self.code_source, 'get_pose'):
+            encoder_pose = self.code_source.get_pose()
+            if encoder_pose[0] is not None or encoder_pose[1] is not None:
+                rot, trans = encoder_pose
+                print(f"[COHORT_DEBUG] Encoder pose extracted:")
+                print(f"  rotation: requires_grad={rot.requires_grad if rot is not None else 'N/A'}, grad_fn={rot.grad_fn if rot is not None else 'N/A'}")
+                print(f"  translation: requires_grad={trans.requires_grad if trans is not None else 'N/A'}, grad_fn={trans.grad_fn if trans is not None else 'N/A'}")
 
         # Use mapping error strategy: flow deforms template to match augmented samples
-        data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample_batch, code)
+        data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample_batch, code, encoder_pose=encoder_pose)
 
         # Use trajectory computed by mapping_error (avoids double computation with subsampling)
         fwd_traj = self.mapping_error.last_fwd_traj
@@ -94,12 +107,13 @@ class CohortRegistration:
 
         return fwd_traj, values
 
-    def train_step(self, template, sample_batch):
+    def train_step(self, template, sample_batch, debug_gradients=False):
         """One gradient step: forward, loss, backward, optimizer step.
 
         Args:
             template: template (canonical reference)
             sample_batch: sample shape batch with shape_ids (input to augment and encode)
+            debug_gradients: if True, print detailed gradient statistics
 
         Returns:
             (trajectory, loss_float, breakdown_dict)
@@ -107,9 +121,89 @@ class CohortRegistration:
         self.optimizer.zero_grad()
         traj, values = self._values(template, sample_batch)
         loss, breakdown = self.composer.compute(values)
+
+        # Debug: check if loss requires gradients
+        print(f"[DEBUG_LOSS] loss.requires_grad={loss.requires_grad}, loss={loss.item():.6f}")
+
         loss.backward()
+
+        if debug_gradients:
+            self._log_gradient_stats()
+
         self.optimizer.step()
         return traj, loss.item(), breakdown
+
+    def _log_gradient_stats(self):
+        """Log detailed gradient statistics for debugging."""
+        print("\n" + "="*60)
+        print("GRADIENT DEBUG STATS")
+        print("="*60)
+
+        # Encoder gradients
+        print("\n[ENCODER]")
+        encoder_stats = self._compute_param_stats(self.code_source.encoder.parameters())
+        self._print_stats("encoder", encoder_stats)
+
+        # Flow gradients
+        print("\n[FLOW]")
+        flow_stats = self._compute_param_stats(self.flow.parameters())
+        self._print_stats("flow", flow_stats)
+
+        # Code source (embeddings) gradients
+        print("\n[CODE SOURCE]")
+        code_stats = self._compute_param_stats(self.code_source.parameters())
+        self._print_stats("code_source", code_stats)
+
+        print("="*60 + "\n")
+
+    def _compute_param_stats(self, parameters):
+        """Compute gradient statistics for a parameter group."""
+        grad_norms = []
+        grad_means = []
+        param_count = 0
+        has_nan = False
+        has_inf = False
+        no_grad_count = 0
+
+        for param in parameters:
+            param_count += 1
+            if param.grad is None:
+                no_grad_count += 1
+            else:
+                grad = param.grad.data
+                if torch.isnan(grad).any():
+                    has_nan = True
+                if torch.isinf(grad).any():
+                    has_inf = True
+                grad_norms.append(grad.norm().item())
+                grad_means.append(grad.mean().item())
+
+        return {
+            'grad_norms': grad_norms,
+            'grad_means': grad_means,
+            'param_count': param_count,
+            'no_grad_count': no_grad_count,
+            'has_nan': has_nan,
+            'has_inf': has_inf,
+        }
+
+    def _print_stats(self, name, stats):
+        """Print gradient statistics."""
+        if stats['no_grad_count'] == stats['param_count']:
+            print(f"  [{name}] ❌ NO GRADIENTS ({stats['param_count']} params)")
+            return
+
+        norms = stats['grad_norms']
+        means = stats['grad_means']
+
+        if norms:
+            print(f"  [{name}] ✓ {len(norms)}/{stats['param_count']} params have gradients")
+            print(f"    norm:  min={min(norms):.2e}, max={max(norms):.2e}, mean={sum(norms)/len(norms):.2e}")
+            print(f"    mean:  min={min(means):.2e}, max={max(means):.2e}, mean={sum(means)/len(means):.2e}")
+            if stats['has_nan']:
+                print(f"    ⚠️  NaN detected in {name} gradients!")
+            if stats['has_inf']:
+                print(f"    ⚠️  Inf detected in {name} gradients!")
 
     @torch.no_grad()
     def eval_step(self, template, sample_batch):

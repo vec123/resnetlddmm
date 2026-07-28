@@ -35,6 +35,10 @@ def SE3_transform(nodes, n_node, rotations, translations, permute=False, key=Non
     # Einstein summation is the most performant way to handle batched matrix-vector mult
     # 'ni,nij->nj' : (N, 3) @ (N, 3, 3) -> (N, 3)
     nodes_new = torch.einsum('ni,nij->nj', nodes, node_rots) + node_trans
+
+    # Debug: check requires_grad
+    if nodes.requires_grad or node_rots.requires_grad or node_trans.requires_grad:
+        print(f"[SE3_DEBUG] nodes.requires_grad={nodes.requires_grad}, node_rots.requires_grad={node_rots.requires_grad}, node_trans.requires_grad={node_trans.requires_grad}, nodes_new.requires_grad={nodes_new.requires_grad}")
     
     # 4. Optional Permutation
     if permute:

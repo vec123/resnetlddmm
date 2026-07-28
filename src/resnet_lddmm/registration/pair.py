@@ -14,7 +14,7 @@ class PairRegistration:
     (state_dict, load_state_dict, train, eval) for reused callbacks.
     """
 
-    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None):
+    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None, use_encoder_pose=False):
         """Initialize the registration stepper.
 
         Args:
@@ -26,6 +26,7 @@ class PairRegistration:
             optimizer: torch optimizer instance
             iso_loss: IsometryLoss instance (optional, created by runner if enabled)
             augmentation: Augmentation instance (optional; defaults to NoAugmentation)
+            use_encoder_pose: bool, whether to extract and apply encoder pose from code_source
         """
         self.flow = flow
         self.code_source = code_source
@@ -35,6 +36,7 @@ class PairRegistration:
         self.optimizer = optimizer
         self.iso_loss = iso_loss
         self.augmentation = augmentation
+        self.use_encoder_pose = use_encoder_pose
         if self.augmentation is None:
             from src.resnet_lddmm.augmentation.none import NoAugmentation
             self.augmentation = NoAugmentation()
@@ -67,9 +69,14 @@ class PairRegistration:
 
         code = self.code_source(augmented_sample)
 
+        # Extract encoder pose if enabled
+        encoder_pose = None
+        if self.use_encoder_pose and hasattr(self.code_source, 'get_pose'):
+            encoder_pose = self.code_source.get_pose()
+
         # Use mapping error strategy: flow deforms template to match augmented sample
         # template is the canonical reference (fixed), sample is what we compare against
-        data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample, code)
+        data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample, code, encoder_pose=encoder_pose)
 
         # Use trajectory computed by mapping_error (avoids double computation with subsampling)
         fwd_traj = self.mapping_error.last_fwd_traj
