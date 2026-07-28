@@ -146,6 +146,14 @@ def build(cfg: ExperimentCfg):
     seed_everything(cfg.train.seed)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
+    # Validate encoder_pose configuration: only unidirectional flow supported
+    use_encoder_pose = getattr(cfg, 'use_encoder_pose', False)
+    if use_encoder_pose and cfg.loss.direction == "bidirectional":
+        raise ValueError(
+            "use_encoder_pose currently supports unidirectional flow only. "
+            "Set loss.direction='forward' or disable use_encoder_pose."
+        )
+
     # Build conditioning (shared across pair/cohort)
     # Orthogonal axes: position_aware (grid interpolation or broadcast?)
     #                  + conditioning_method (concat or FiLM modulation?)

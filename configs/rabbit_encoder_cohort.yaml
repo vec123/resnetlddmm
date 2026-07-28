@@ -1,6 +1,6 @@
 source: data/rabbit/cohort
 target: data/rabbit/T90.obj
-output_dir: outputs/rabbit_encoder_cohort_so3
+output_dir: outputs/rabbit_encoder_cohort_fix
 
 field:
   kind: time_varying
@@ -57,7 +57,7 @@ code:
     noise_std: 0.0
 
 augmentation:
-  kind: so3
+  kind: none
   seed: 42
 
 loss:

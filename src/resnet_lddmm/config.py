@@ -92,6 +92,7 @@ class ExperimentCfg:
     loss: LossCfg = dataclass_field(default_factory=LossCfg)
     augmentation: AugmentationCfg = dataclass_field(default_factory=AugmentationCfg)
     train: TrainCfg = dataclass_field(default_factory=TrainCfg)
+    use_encoder_pose: bool = False          # Apply learned encoder pose to flow output (unidirectional only)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ExperimentCfg":
@@ -99,7 +100,7 @@ class ExperimentCfg:
 
         Handles nested config for encoder_config and graph_spec.
         """
-        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train"}
+        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "use_encoder_pose"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
@@ -122,6 +123,7 @@ class ExperimentCfg:
             loss=loss_cfg,
             augmentation=augmentation_cfg,
             train=train_cfg,
+            use_encoder_pose=d.get("use_encoder_pose", False),
         )
 
 

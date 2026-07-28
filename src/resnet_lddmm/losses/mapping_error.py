@@ -3,6 +3,7 @@
 from typing import Tuple, Optional
 import torch
 from torch import Tensor
+from src.transforms.group_transforms import SE3_transform
 
 
 class UnidirectionalMappingError:
@@ -32,7 +33,7 @@ class UnidirectionalMappingError:
         self.last_fwd_traj = None  # Store trajectory to avoid recomputation
         self.last_fwd_traj_full = None  # Store full trajectory if save_full=True
 
-    def __call__(self, flow, data_term, template, sample, code) -> Tuple[Tensor, Tensor]:
+    def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
         """Compute unidirectional mapping error.
 
         Args:
@@ -41,6 +42,7 @@ class UnidirectionalMappingError:
             template: batch with .points [B,N,3] (canonical reference, where flow starts)
             sample: batch with .points [B,M,3] (augmented input, encoder input)
             code: [B, n_z] or None
+            encoder_pose: Optional (rotation [B,3,3], translation [B,3]) tuple, or None
 
         Returns:
             (data_loss, kinetic_energy) tuple of scalars
@@ -60,6 +62,11 @@ class UnidirectionalMappingError:
         fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
         pred = fwd.end
+
+        # Apply encoder pose if provided (transforms pred to augmented frame for comparison)
+        if encoder_pose is not None and (encoder_pose[0] is not None or encoder_pose[1] is not None):
+            rotation, translation = encoder_pose
+            pred = self._apply_encoder_pose(pred, rotation, translation)
 
         # Optionally compute full trajectory for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
@@ -98,6 +105,46 @@ class UnidirectionalMappingError:
         # Randomly select indices (same for all batch elements)
         indices = torch.randperm(N, device=points.device)[:n_subsample]
         return points[:, indices, :]
+
+    @staticmethod
+    def _apply_encoder_pose(points: Tensor, rotation: Optional[Tensor],
+                            translation: Optional[Tensor]) -> Tensor:
+        """Apply SE(3) transformation: points_out = R @ points + t.
+
+        Args:
+            points: [B, N, 3] or [B*N, 3]
+            rotation: [B, 3, 3] or None
+            translation: [B, 3] or None
+
+        Returns:
+            [B, N, 3] or [B*N, 3] transformed points
+        """
+        is_batched = points.ndim == 3
+        if is_batched:
+            B, N, D = points.shape
+            flat_points = points.reshape(B * N, 3)
+        else:
+            flat_points = points
+
+        if rotation is None and translation is None:
+            return points
+
+        # Infer batch size from rotation if available
+        if rotation is not None:
+            B = rotation.shape[0]
+        else:
+            B = translation.shape[0]
+
+        n_node = torch.full((B,), flat_points.shape[0] // B, dtype=torch.long, device=points.device)
+
+        rot = rotation if rotation is not None else torch.eye(3, device=points.device).unsqueeze(0).expand(B, -1, -1)
+        trans = translation if translation is not None else torch.zeros(B, 3, device=points.device)
+
+        transformed = SE3_transform(flat_points, n_node, rot, trans)
+
+        if is_batched:
+            transformed = transformed.reshape(B, N, 3)
+        return transformed
 
 
 class BidirectionalMappingError:
