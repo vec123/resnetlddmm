@@ -252,7 +252,7 @@ def export_reference_shapes(source, target, transform, out_dir):
 
     # Create and save source PolyData (point cloud, no faces)
     source_polydata = create_polydata(source_points_world, faces=None)
-    source_path = os.path.join(out_dir, "source.vtp")
+    source_path = os.path.join(out_dir, "template_points.vtp")
     save_vtp(source_polydata, source_path, binary=True)
 
     # Denormalize target points
@@ -267,7 +267,7 @@ def export_reference_shapes(source, target, transform, out_dir):
 
     # Create and save target PolyData (point cloud, no faces)
     target_polydata = create_polydata(target_points_world, faces=None)
-    target_path = os.path.join(out_dir, "target.vtp")
+    target_path = os.path.join(out_dir, "sample_points.vtp")
     save_vtp(target_polydata, target_path, binary=True)
 
     print(f"[io.export_reference_shapes] Exported source ({source_points_world.shape[0]} points) and target ({target_points_world.shape[0]} points)")
