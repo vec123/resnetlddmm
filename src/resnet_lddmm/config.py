@@ -61,6 +61,14 @@ class LossCfg:
         return max(1, int(self.subsample_M * n_source))
 
 @dataclass
+class AugmentationCfg:
+    """Configuration for source shape augmentation (random group transformations)."""
+    kind: str = "none"                      # none | so3 | se3
+    seed: Optional[int] = None              # Random seed for reproducibility
+    translation_scale: float = 0.2          # Only for SE3: bounds on uniform translation
+
+
+@dataclass
 class TrainCfg:
     mode: str = "pair"                      # pair | cohort
     steps: int = 2000
@@ -82,6 +90,7 @@ class ExperimentCfg:
     field: FieldCfg = dataclass_field(default_factory=FieldCfg)
     code: CodeCfg = dataclass_field(default_factory=CodeCfg)
     loss: LossCfg = dataclass_field(default_factory=LossCfg)
+    augmentation: AugmentationCfg = dataclass_field(default_factory=AugmentationCfg)
     train: TrainCfg = dataclass_field(default_factory=TrainCfg)
 
     @classmethod
@@ -90,13 +99,14 @@ class ExperimentCfg:
 
         Handles nested config for encoder_config and graph_spec.
         """
-        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "train"}
+        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
 
         field_cfg = FieldCfg(**d.get("field", {})) if "field" in d else FieldCfg()
         loss_cfg = LossCfg(**d.get("loss", {})) if "loss" in d else LossCfg()
+        augmentation_cfg = AugmentationCfg(**d.get("augmentation", {})) if "augmentation" in d else AugmentationCfg()
         train_cfg = TrainCfg(**d.get("train", {})) if "train" in d else TrainCfg()
 
         # Handle code config with special parsing for encoder_config and graph_spec
@@ -110,6 +120,7 @@ class ExperimentCfg:
             field=field_cfg,
             code=code_cfg,
             loss=loss_cfg,
+            augmentation=augmentation_cfg,
             train=train_cfg,
         )
 
@@ -139,6 +150,14 @@ def _parse_code_config(code_dict: dict) -> CodeCfg:
         else:
             # Use default EncoderConfig
             encoder_cfg = EncoderConfig()
+
+        # Validate n_z matches encoder's latent_dim
+        config_n_z = code_dict.get("n_z", 256)
+        encoder_latent_dim = encoder_cfg.latent_dim
+        if config_n_z != encoder_latent_dim:
+            print(f"WARNING: code.n_z={config_n_z} does not match encoder_config.latent_dim={encoder_latent_dim}")
+            print(f"         Using encoder_config.latent_dim={encoder_latent_dim} (encoder determines code dimension)")
+            code_dict["n_z"] = encoder_latent_dim
 
     # Parse graph_spec if provided and kind is encoder
     graph_spec = None

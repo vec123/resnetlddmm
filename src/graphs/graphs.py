@@ -20,7 +20,8 @@ def estimate_vertex_areas(pos, batch, k=8):
     k = min(k, N - 1)
     row, col = torch_cluster.knn(pos, pos, k + 1, batch, batch)   # k+1 = self + k neighbours
     d = (pos[row] - pos[col]).norm(dim=-1)
-    rk = scatter(d, row, dim=0, dim_size=N, reduce='max')         # farthest of k+1 = k-th nbr
+
+    rk = scatter(d, row, dim=0, dim_size=N, reduce='max')
     return math.pi * rk.pow(2) / k
 
 

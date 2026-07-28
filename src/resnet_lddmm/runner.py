@@ -214,11 +214,24 @@ def build(cfg: ExperimentCfg):
     ]
     composer = LossComposer(terms)
 
+    # Build augmentation (shared across pair/cohort)
+    # Only pass seed for so3 and se3; none doesn't accept it
+    aug_kwargs = {}
+    if cfg.augmentation.kind in ("so3", "se3"):
+        aug_kwargs["seed"] = cfg.augmentation.seed
+    if cfg.augmentation.kind == "se3":
+        aug_kwargs["translation_scale"] = cfg.augmentation.translation_scale
+
+    augmentation = Registry.create(
+        "augmentation", cfg.augmentation.kind,
+        **aug_kwargs
+    )
+
     # Branch on training mode (mapping_error created after loading shapes)
     if cfg.train.mode == "cohort":
-        return _build_cohort(cfg, flow, data_term, composer, iso_loss)
+        return _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation)
     else:
-        return _build_pair(cfg, flow, data_term, composer, iso_loss)
+        return _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation)
 
 
 def _build_code_source(kind, code_cfg):
@@ -266,7 +279,7 @@ def _build_code_source_cohort(num_shapes, kind, code_cfg):
         return Registry.create("code", kind)
 
 
-def _build_pair(cfg, flow, data_term, composer, iso_loss):
+def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation):
     """Build PairRegistration stepper."""
     # Load and normalize shapes
     source_shape = load_shape(cfg.source)
@@ -297,7 +310,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss):
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr, weight_decay=cfg.loss.weight_decay)
 
     # Create stepper
-    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss)
+    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation)
 
     # Dump config to output dir
     _dump_config(cfg, "pair")
@@ -305,7 +318,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss):
     return stepper, loader, transform
 
 
-def _build_cohort(cfg, flow, data_term, composer, iso_loss):
+def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation):
     """Build CohortRegistration stepper."""
     # Load all cohort shapes from directory
     cohort_paths = sorted(glob.glob(os.path.join(cfg.source, "*.obj"))) + \
@@ -342,7 +355,7 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss):
     ], lr=cfg.train.lr)
 
     # Create stepper
-    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss)
+    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation)
 
     # Dump config to output dir
     _dump_config(cfg, "cohort")

@@ -45,3 +45,8 @@ Registry.register("code", "encoder", "src.resnet_lddmm.codes.encoder:EncoderCode
 
 # IsometryLoss (shape-preserving regularization)
 Registry.register("iso_loss", "isometry", "src.resnet_lddmm.losses.data_terms:IsometryLoss")
+
+# Augmentation: random group transformations (SE(3), SO(3), or none)
+Registry.register("augmentation", "none", "src.resnet_lddmm.augmentation.none:NoAugmentation")
+Registry.register("augmentation", "so3", "src.resnet_lddmm.augmentation.so3:SO3Augmentation")
+Registry.register("augmentation", "se3", "src.resnet_lddmm.augmentation.se3:SE3Augmentation")

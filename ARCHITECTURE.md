@@ -277,7 +277,36 @@ class MappingError(ABC):
   - Returns D(φ(source), target) + D(φ⁻¹(target), source) + KE(forward) + KE(backward)
   - Subsamples forward and backward predicted shapes independently
 
-### 3.7 NeuralODEFlow
+### 3.7 Augmentation (Strategy Pattern)
+
+```python
+class Augmentation(nn.Module, ABC):
+    def forward(self, points: Tensor) -> Tensor:
+        """
+        points: [B, N, 3] source point cloud
+        Returns: [B, N, 3] augmented points
+        """
+```
+
+**Semantics**: Applies random group transformations (SO(3) or SE(3)) to source points before flow. Template stays fixed in canonical space. This is data augmentation: the flow learns to handle shapes at various random poses.
+
+**Invariants**:
+- Output shape exactly matches input
+- Gradients flow from loss → augmented points → transformation → flow parameters
+- Applied per-batch (each shape in batch gets independent random transformation)
+
+**Implementations**:
+- **NoAugmentation**: Identity transformation (default, zero overhead, backward-compatible)
+- **SO3Augmentation**: Random rotation from SO(3) via quaternion sampling
+  - Deterministic with `seed` parameter
+  - Preserves pairwise distances (isometry)
+  - Config: `kind: so3, seed: optional_int`
+  
+- **SE3Augmentation**: Random rotation + translation
+  - Rotations uniform on SO(3), translations uniform in `[-translation_scale, +translation_scale]³`
+  - Config: `kind: se3, seed: optional_int, translation_scale: float`
+
+### 3.8 NeuralODEFlow
 
 Not an ABC, but the facade that wires components together:
 
@@ -301,7 +330,30 @@ class NeuralODEFlow(nn.Module):
 
 ---
 
-## 4. Component Organization
+## 4. Data Flow Example: With Augmentation
+
+When augmentation is enabled (e.g., `kind: se3`):
+
+```
+source_batch.points [B, N, 3] (canonical)
+  ↓ Augmentation.forward (random SE(3))
+augmented_points [B, N, 3] (at random pose)
+  ↓ ShapeCode (receives augmented batch)
+code [B, n_z] (per-shape latent)
+  ↓ NeuralODEFlow (forward integration)
+flow(augmented_points, code)
+  → trajectory (source → target deformation)
+  → loss terms (data, kinetic, code_reg, isometry)
+  → backward pass
+  → gradients reach: flow params, code params
+  → rotation/translation in augmentation (detached, no gradient)
+```
+
+**Key invariant**: Augmentation is deterministic per-step within training (seeded RNG), but varies step-to-step. Template points remain in canonical space (no augmentation applied to target).
+
+---
+
+## 5. Component Organization
 
 ### 4.1 Directories and Modules
 
@@ -322,6 +374,13 @@ src/resnet_lddmm/
 │   ├── base.py                   # Conditioning ABC
 │   ├── film.py                   # ConcatConditioning, FiLM
 │   ├── position_aware.py         # PositionAware (grid interpolation)
+│   └── __init__.py
+│
+├── augmentation/                 # Group transformation strategies (SO(3), SE(3))
+│   ├── base.py                   # Augmentation ABC
+│   ├── none.py                   # NoAugmentation (identity)
+│   ├── so3.py                    # SO3Augmentation (rotation)
+│   ├── se3.py                    # SE3Augmentation (rotation + translation)
 │   └── __init__.py
 │
 ├── codes/                        # Shape code implementations
@@ -473,6 +532,10 @@ ExperimentCfg
   │   ├─ isometry_type: str     # strain | det | orthogonal
   │   ├─ isometry_samples: int  # points per step for isometry sampling
   │   └─ subsample_M: int       # random subsample pred to N points; 0 = disabled
+  ├─ augmentation: AugmentationCfg
+  │   ├─ kind: str              # none | so3 | se3
+  │   ├─ seed: int | None       # random seed for reproducibility
+  │   └─ translation_scale: float # SE(3) only: bounds on uniform translation
   └─ train: TrainCfg
       ├─ mode: str             # pair | cohort
       ├─ steps: int
@@ -558,6 +621,47 @@ loss:
 train:
   mode: cohort
   steps: 2000
+```
+
+**With SE(3) Augmentation (pose randomization)**:
+```yaml
+source: data/rabbit/cohort
+target: data/rabbit/template.obj
+output_dir: outputs/rabbit_augmented
+field:
+  kind: stationary
+  num_steps: 10
+code:
+  kind: auto_decoder
+  n_z: 256
+augmentation:
+  kind: se3
+  seed: 42
+  translation_scale: 0.2
+loss:
+  data_name: chamfer
+  direction: bidirectional
+  sigma: 0.0001
+  kinetic_weight: 1.0
+train:
+  mode: cohort
+  steps: 2000
+  batch: 8
+  lr: 1e-3
+```
+
+**With SO(3) Augmentation (rotation only)**:
+```yaml
+augmentation:
+  kind: so3
+  seed: 42
+```
+
+**No Augmentation (default, backward-compatible)**:
+```yaml
+# Omit augmentation section, or:
+augmentation:
+  kind: none
 ```
 
 ---

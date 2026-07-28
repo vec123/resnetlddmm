@@ -14,7 +14,7 @@ class PairRegistration:
     (state_dict, load_state_dict, train, eval) for reused callbacks.
     """
 
-    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None):
+    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None):
         """Initialize the registration stepper.
 
         Args:
@@ -25,6 +25,7 @@ class PairRegistration:
             composer: LossComposer instance
             optimizer: torch optimizer instance
             iso_loss: IsometryLoss instance (optional, created by runner if enabled)
+            augmentation: Augmentation instance (optional; defaults to NoAugmentation)
         """
         self.flow = flow
         self.code_source = code_source
@@ -33,23 +34,42 @@ class PairRegistration:
         self.composer = composer
         self.optimizer = optimizer
         self.iso_loss = iso_loss
+        self.augmentation = augmentation
+        if self.augmentation is None:
+            from src.resnet_lddmm.augmentation.none import NoAugmentation
+            self.augmentation = NoAugmentation()
         self.is_bidirectional = isinstance(mapping_error, BidirectionalMappingError)
         self.backward_traj = None  # Stored when bidirectional
+        self.augmented_sample = None  # Store augmented sample for logger access
 
-    def _values(self, source, target):
+    def _values(self, template, sample):
         """Compute trajectory and per-term loss values.
 
         Args:
-            source: batch-like with .points [B,N,3] and optionally .weights
-            target: batch-like with .points [B,M,3] and optionally .weights
+            template: batch-like with .points [B,N,3] (canonical reference, where flow starts)
+            sample: batch-like with .points [B,M,3] (input to be augmented and encoded)
 
         Returns:
             (fwd_traj, values_dict) where values_dict has keys for data, kinetic, code_reg, isometry
         """
-        code = self.code_source(source)
+        # Apply augmentation to sample points (random SO(3) or SE(3) transformation)
+        augmented_points = self.augmentation(sample.points)
 
-        # Use mapping error strategy (encapsulates direction logic)
-        data, kinetic = self.mapping_error(self.flow, self.data_term, source, target, code)
+        # Create augmented batch with transformed points, preserving other fields
+        augmented_sample = type(sample)(
+            points=augmented_points,
+            weights=sample.weights,
+            faces=sample.faces,
+        )
+
+        # Store augmented sample for logger access
+        self.augmented_sample = augmented_sample
+
+        code = self.code_source(augmented_sample)
+
+        # Use mapping error strategy: flow deforms template to match augmented sample
+        # template is the canonical reference (fixed), sample is what we compare against
+        data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample, code)
 
         # Use trajectory computed by mapping_error (avoids double computation with subsampling)
         fwd_traj = self.mapping_error.last_fwd_traj
@@ -72,35 +92,35 @@ class PairRegistration:
 
         return fwd_traj, values
 
-    def train_step(self, source, target):
+    def train_step(self, template, sample):
         """One gradient step: forward, loss, backward, optimizer step.
 
         Args:
-            source: source shape batch
-            target: target shape batch
+            template: template (canonical reference)
+            sample: sample shape (input to encode and augment)
 
         Returns:
             (trajectory, loss_float, breakdown_dict)
         """
         self.optimizer.zero_grad()
-        traj, values = self._values(source, target)
+        traj, values = self._values(template, sample)
         loss, breakdown = self.composer.compute(values)
         loss.backward()
         self.optimizer.step()
         return traj, loss.item(), breakdown
 
     @torch.no_grad()
-    def eval_step(self, source, target):
+    def eval_step(self, template, sample):
         """Evaluate loss without gradient accumulation.
 
         Args:
-            source: source shape batch
-            target: target shape batch
+            template: template (canonical reference)
+            sample: sample shape (input to encode and augment)
 
         Returns:
             (trajectory, loss_float, breakdown_dict)
         """
-        traj, values = self._values(source, target)
+        traj, values = self._values(template, sample)
         loss, breakdown = self.composer.compute(values)
         return traj, loss.item(), breakdown
 

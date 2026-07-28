@@ -6,14 +6,14 @@ from torch import Tensor
 
 
 class UnidirectionalMappingError:
-    """Forward-only mapping error: D(φ(S), T) and kinetic energy of forward trajectory.
+    """Forward-only mapping error: D(φ(T), S) and kinetic energy of forward trajectory.
 
     Used for per-pair registration (Milestone A). Computes data term and kinetic
-    energy over the forward trajectory only.
+    energy over the forward trajectory only. Flow deforms template to match sample.
 
     Supports optional random subsampling for computational efficiency on high-density shapes:
-    both source and target are subsampled to subsample_n points before data-term computation,
-    but flow is only computed on subsampled source. Tracks full and subsampled vertex counts.
+    both template and sample are subsampled to subsample_n points before data-term computation,
+    but flow is only computed on subsampled template. Tracks full and subsampled vertex counts.
     Optionally computes and stores full trajectory when save_full=True.
     """
 
@@ -32,51 +32,51 @@ class UnidirectionalMappingError:
         self.last_fwd_traj = None  # Store trajectory to avoid recomputation
         self.last_fwd_traj_full = None  # Store full trajectory if save_full=True
 
-    def __call__(self, flow, data_term, source, target, code) -> Tuple[Tensor, Tensor]:
+    def __call__(self, flow, data_term, template, sample, code) -> Tuple[Tensor, Tensor]:
         """Compute unidirectional mapping error.
 
         Args:
             flow: NeuralODEFlow instance
             data_term: DataTerm instance
-            source: batch with .points [B,N,3]
-            target: batch with .points [B,M,3]
+            template: batch with .points [B,N,3] (canonical reference, where flow starts)
+            sample: batch with .points [B,M,3] (augmented input, encoder input)
             code: [B, n_z] or None
 
         Returns:
             (data_loss, kinetic_energy) tuple of scalars
         """
-        # Track full source vertices
-        self.last_full_vertices = source.points.shape[1]
+        # Track full template vertices
+        self.last_full_vertices = template.points.shape[1]
 
-        # Subsample source points before flow if configured
-        source_points = source.points
+        # Subsample template points before flow if configured
+        template_points = template.points
         if self.subsample_n is not None and self.subsample_n > 0:
-            source_points = self._subsample_points(source_points, self.subsample_n)
-            self.last_subsample_vertices = source_points.shape[1]
+            template_points = self._subsample_points(template_points, self.subsample_n)
+            self.last_subsample_vertices = template_points.shape[1]
         else:
             self.last_subsample_vertices = self.last_full_vertices
 
-        # Flow on (possibly subsampled) source
-        fwd = flow(source_points, code)
+        # Flow on (possibly subsampled) template points
+        fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
         pred = fwd.end
 
         # Optionally compute full trajectory for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
-            self.last_fwd_traj_full = flow(source.points, code)
+            self.last_fwd_traj_full = flow(template.points, code)
         else:
             self.last_fwd_traj_full = None
 
-        # Subsample target for data-term computation (faster Chamfer on dense clouds)
-        target_points = target.points
-        target_weights = target.weights
+        # Subsample sample points for data-term computation (faster Chamfer on dense clouds)
+        sample_points = sample.points
+        sample_weights = sample.weights
         if self.subsample_n is not None and self.subsample_n > 0:
-            target_points = self._subsample_points(target_points, self.subsample_n)
+            sample_points = self._subsample_points(sample_points, self.subsample_n)
             # Subsample weights if present
-            if target_weights is not None:
-                target_weights = self._subsample_points(target_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
+            if sample_weights is not None:
+                sample_weights = self._subsample_points(sample_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
 
-        data = data_term(pred, target_points, tgt_w=target_weights)
+        data = data_term(pred, sample_points, tgt_w=sample_weights)
         kinetic = fwd.kinetic_energy()
         return data, kinetic
 
@@ -101,13 +101,14 @@ class UnidirectionalMappingError:
 
 
 class BidirectionalMappingError:
-    """Bidirectional mapping error: D(φ(S), T) + D(φ⁻¹(T), S).
+    """Bidirectional mapping error: D(φ(T), S) + D(φ⁻¹(S), T).
 
     Used for cohort registration (Milestone B). Computes data term and kinetic
     energy summed over both forward and backward trajectories (AD-SVFD Eq. loss function).
+    Forward: deform template to match sample. Backward: inverse flow from sample.
 
     Supports optional random subsampling for computational efficiency on high-density shapes:
-    both source and target are subsampled to subsample_n points before data-term computation,
+    both template and sample are subsampled to subsample_n points before data-term computation,
     but flows are computed on subsampled points. Tracks full and subsampled vertex counts.
     Optionally computes and stores full trajectories when save_full=True.
     """
@@ -130,61 +131,61 @@ class BidirectionalMappingError:
         self.last_fwd_traj_full = None  # Store full trajectories if save_full=True
         self.last_bwd_traj_full = None
 
-    def __call__(self, flow, data_term, source, target, code) -> Tuple[Tensor, Tensor]:
+    def __call__(self, flow, data_term, template, sample, code) -> Tuple[Tensor, Tensor]:
         """Compute bidirectional mapping error.
 
         Args:
             flow: NeuralODEFlow instance (must support .inverse())
             data_term: DataTerm instance
-            source: batch with .points [B,N,3]
-            target: batch with .points [B,M,3]
+            template: batch with .points [B,N,3] (canonical reference)
+            sample: batch with .points [B,M,3] (augmented input)
             code: [B, n_z] or None
 
         Returns:
             (data_loss, kinetic_energy) tuple where:
-            - data_loss = D(φ(S), T) + D(φ⁻¹(T), S)
+            - data_loss = D(φ(T), S) + D(φ⁻¹(S), T)
             - kinetic_energy = KE(forward) + KE(backward)
         """
         # Track full vertex counts
-        self.last_full_source_vertices = source.points.shape[1]
-        self.last_full_target_vertices = target.points.shape[1]
+        self.last_full_source_vertices = template.points.shape[1]
+        self.last_full_target_vertices = sample.points.shape[1]
 
-        # Subsample source and target before flow if configured
-        source_points = source.points
-        target_points = target.points
-        source_weights = source.weights
-        target_weights = target.weights
+        # Subsample template and sample before flow if configured
+        template_points = template.points
+        sample_points = sample.points
+        template_weights = template.weights
+        sample_weights = sample.weights
 
         if self.subsample_n is not None and self.subsample_n > 0:
-            source_points = self._subsample_points(source_points, self.subsample_n)
-            target_points = self._subsample_points(target_points, self.subsample_n)
+            template_points = self._subsample_points(template_points, self.subsample_n)
+            sample_points = self._subsample_points(sample_points, self.subsample_n)
             # Subsample weights if present
-            if source_weights is not None:
-                source_weights = self._subsample_points(source_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
-            if target_weights is not None:
-                target_weights = self._subsample_points(target_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
+            if template_weights is not None:
+                template_weights = self._subsample_points(template_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
+            if sample_weights is not None:
+                sample_weights = self._subsample_points(sample_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
             self.last_subsample_vertices = self.subsample_n
         else:
             self.last_subsample_vertices = None
 
-        # Flow on (possibly subsampled) source and target
-        fwd = flow(source_points, code)
-        bwd = flow.inverse(target_points, code)
+        # Flow on (possibly subsampled) template and sample
+        fwd = flow(template_points, code)
+        bwd = flow.inverse(sample_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in cohort.py)
         self.last_bwd_traj = bwd
 
         # Optionally compute full trajectories for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
-            self.last_fwd_traj_full = flow(source.points, code)
-            self.last_bwd_traj_full = flow.inverse(target.points, code)
+            self.last_fwd_traj_full = flow(template.points, code)
+            self.last_bwd_traj_full = flow.inverse(sample.points, code)
         else:
             self.last_fwd_traj_full = None
             self.last_bwd_traj_full = None
 
         # Data term: forward distance + backward distance (both on subsampled points)
         data = (
-            data_term(fwd.end, target_points, tgt_w=target_weights)
-            + data_term(bwd.end, source_points, tgt_w=source_weights)
+            data_term(fwd.end, sample_points, tgt_w=sample_weights)
+            + data_term(bwd.end, template_points, tgt_w=template_weights)
         )
 
         # Kinetic energy: sum over both trajectories

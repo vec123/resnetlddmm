@@ -172,16 +172,17 @@ class CohortBatch:
 class CohortBatchLoader:
     """Yields batches of cohort shapes for CohortRegistration training.
 
-    Mini-batches shapes over cohort members, yielding (source_batch, target_batch) tuples
-    where source_batch is a CohortBatch with shape_ids and target_batch has template points.
-    Shapes are kept separate in the batch dimension: [B, N, 3] not concatenated.
+    Mini-batches shapes over cohort members, yielding (template_batch, sample_batch) tuples
+    where template_batch is the canonical reference [1, M, 3] and sample_batch is a CohortBatch
+    with shape_ids [B, N, 3] containing the cohort members. Shapes are kept separate in the
+    batch dimension, not concatenated.
     """
     def __init__(self, cohort_shapes, template, batch_size=None, rng=None):
         """Initialize cohort batch loader.
 
         Args:
-            cohort_shapes: list of Shape objects (cohort members)
-            template: Shape object (target template)
+            cohort_shapes: list of Shape objects (cohort members to augment and encode)
+            template: Shape object (canonical reference, where flow starts)
             batch_size: mini-batch size over cohort, or None for full batch
             rng: torch.Generator for reproducible mini-batching (optional)
         """
@@ -213,15 +214,15 @@ class CohortBatchLoader:
                 weights = torch.stack([s.weights.squeeze(0) for s in selected_shapes], dim=0)
 
             # Collect per-shape faces (one per shape in batch)
-            source_faces = [s.faces if hasattr(s, 'faces') else None for s in selected_shapes]
+            sample_faces = [s.faces if hasattr(s, 'faces') else None for s in selected_shapes]
 
-            # Create target batch (template) with single faces object
-            target_batch = CohortBatch(
+            # Create template batch (canonical reference) with single faces object
+            template_batch = CohortBatch(
                 points=self.template.points,  # [1, M, 3]
                 shape_ids=torch.tensor([0], dtype=torch.long),  # [1]
                 weights=self.template.weights,
                 faces=[self.template.faces if hasattr(self.template, 'faces') else None]
             )
 
-            source_batch = CohortBatch(points=points, shape_ids=shape_ids, weights=weights, faces=source_faces)
-            yield source_batch, target_batch
+            sample_batch = CohortBatch(points=points, shape_ids=shape_ids, weights=weights, faces=sample_faces)
+            yield template_batch, sample_batch

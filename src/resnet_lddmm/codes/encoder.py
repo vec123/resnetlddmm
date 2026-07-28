@@ -49,28 +49,24 @@ class EncoderCodes(ShapeCode):
         B = points.shape[0]
         N = points.shape[1]
 
-        # Build per-node mask: shape index for each node
-        # e.g., [0,0,...,0,  1,1,...,1,  2,2,...,2] for 3 shapes
-        mask = torch.arange(B, device=points.device).repeat_interleave(N)
+        # Create 2D boolean mask for graph builder (all valid nodes)
+        mask = torch.ones((B, N), dtype=torch.bool, device=points.device)
 
         # Get RNG for graph building
         rng = self._get_rng()
 
-        # Flatten batch to single point cloud for graph building
-        points_flat = points.reshape(B * N, 3)
-
         # Extract weights and normals if available
         weights = None
         if hasattr(batch, 'weights') and batch.weights is not None:
-            weights = batch.weights.reshape(-1)
+            weights = batch.weights
 
         normals = None
         if hasattr(batch, 'normals') and batch.normals is not None:
-            normals = batch.normals.reshape(-1, 3)
+            normals = batch.normals
 
-        # Build graph
+        # Build graph (vertices should be [B, N, 3], mask [B, N])
         graph, supergraph = self.graph_builder.build(
-            points_flat, mask, rng,
+            points, mask, rng,
             areas=weights, normals=normals
         )
 
@@ -101,13 +97,13 @@ class EncoderCodes(ShapeCode):
         return None
 
     def _get_rng(self):
-        """Get PRNG key for graph building (jax RNG format).
+        """Get PRNG for graph building.
 
         Returns:
-            jax.random.PRNGKey with shape (2,) and dtype uint32
+            None to use default PyTorch RNG
         """
-        import jax
-        return jax.random.PRNGKey(0)
+        # Return None to use default RNG; can be seeded via torch.manual_seed if needed
+        return None
 
     def train(self):
         """Set encoder to training mode."""
