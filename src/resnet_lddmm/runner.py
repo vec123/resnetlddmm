@@ -27,7 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor
 
 
 def _encoder_layers_to_list_of_dicts(encoder_config):
@@ -427,6 +427,7 @@ def run(cfg: ExperimentCfg, callbacks=None):
             NetworkStructureInspector(),
             VerboseCallback(log_every=log_every),
             GradientLogger(every_n_steps=log_every),
+            RequiresGradMonitor(every_n_steps=log_every),
             TrajectoryExporter(every_n_steps=save_every, export_shapes=export_shapes,
                              export_strategy=export_strategy, rng=export_rng),
             DiagnosticsCallback(every_n_steps=save_every),

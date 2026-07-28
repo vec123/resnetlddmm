@@ -80,11 +80,8 @@ class EncoderCodes(ShapeCode):
             supergraph = supergraph.to(points.device)
 
         # Forward through encoder: returns EncoderOutput with latent (or mu) and pose
-        print(f"[ENCODER_FORWARD] encoder.training={self.encoder.training}")
         encoder_out = self.encoder(graph, supergraph)
         self._last = encoder_out
-        if hasattr(encoder_out, 'rotation') and encoder_out.rotation is not None:
-            print(f"[ENCODER_FORWARD] encoder_out.rotation.requires_grad={encoder_out.rotation.requires_grad}, grad_fn={encoder_out.rotation.grad_fn}")
 
         # Sample from latent (deterministic=True uses mu if VAE, else latent)
         z = encoder_out.sample(deterministic=True)  # [B, n_z]

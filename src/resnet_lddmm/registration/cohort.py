@@ -71,17 +71,11 @@ class CohortRegistration:
         self.augmented_sample_batch = augmented_sample_batch
 
         code = self.code_source(augmented_sample_batch)
-        print(f"[COHORT_DEBUG] After encoder: code.requires_grad={code.requires_grad}, grad_fn={code.grad_fn}")
 
         # Extract encoder pose if enabled
         encoder_pose = None
         if self.use_encoder_pose and hasattr(self.code_source, 'get_pose'):
             encoder_pose = self.code_source.get_pose()
-            if encoder_pose[0] is not None or encoder_pose[1] is not None:
-                rot, trans = encoder_pose
-                print(f"[COHORT_DEBUG] Encoder pose extracted:")
-                print(f"  rotation: requires_grad={rot.requires_grad if rot is not None else 'N/A'}, grad_fn={rot.grad_fn if rot is not None else 'N/A'}")
-                print(f"  translation: requires_grad={trans.requires_grad if trans is not None else 'N/A'}, grad_fn={trans.grad_fn if trans is not None else 'N/A'}")
 
         # Use mapping error strategy: flow deforms template to match augmented samples
         data, kinetic = self.mapping_error(self.flow, self.data_term, template, augmented_sample_batch, code, encoder_pose=encoder_pose)
@@ -121,9 +115,6 @@ class CohortRegistration:
         self.optimizer.zero_grad()
         traj, values = self._values(template, sample_batch)
         loss, breakdown = self.composer.compute(values)
-
-        # Debug: check if loss requires gradients
-        print(f"[DEBUG_LOSS] loss.requires_grad={loss.requires_grad}, loss={loss.item():.6f}")
 
         loss.backward()
 

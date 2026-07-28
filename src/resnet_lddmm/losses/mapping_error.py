@@ -66,7 +66,6 @@ class UnidirectionalMappingError:
         fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
         pred = fwd.end
-        print(f"[FLOW_DEBUG] after flow: pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
 
         # Apply encoder pose if provided (transforms pred to augmented frame for comparison)
         if encoder_pose is not None and (encoder_pose[0] is not None or encoder_pose[1] is not None):
@@ -76,17 +75,10 @@ class UnidirectionalMappingError:
             if translation is not None and not translation.requires_grad:
                 translation = None
 
-            # CRITICAL: if rotation doesn't require grad, gradients won't flow back to encoder
-            print(f"[POSE_DEBUG] Before applying pose:")
-            print(f"  rotation: requires_grad={rotation.requires_grad if rotation is not None else 'N/A'}, grad_fn={rotation.grad_fn if rotation is not None else 'N/A'}")
-            print(f"  translation: requires_grad={translation.requires_grad if translation is not None else 'N/A'}, grad_fn={translation.grad_fn if translation is not None else 'N/A'}")
-            print(f"  pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
-
             if rotation is not None and not rotation.requires_grad:
                 print(f"[GRADIENT_ERROR] rotation.requires_grad=False! This breaks gradient flow to encoder.")
 
             pred = self._apply_encoder_pose(pred, rotation, translation)
-            print(f"[POSE_DEBUG] After applying pose: pred.requires_grad={pred.requires_grad}, grad_fn={pred.grad_fn}")
 
         # Optionally compute full trajectory for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:

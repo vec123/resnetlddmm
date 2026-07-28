@@ -235,13 +235,7 @@ class GroupEncoder(nn.Module):
 
         # Extract v1, v2 for rotation matrix (2 vectors -> 3x3 R)
         v1, v2 = vec_graph[:, 0, :], vec_graph[:, 1, :]
-        v1_norm = v1.norm(dim=-1).mean().item()
-        v2_norm = v2.norm(dim=-1).mean().item()
-        print(f"[ENCODER_DEBUG] Rotation computation:")
-        print(f"  v1: requires_grad={v1.requires_grad}, grad_fn={v1.grad_fn}, norm={v1_norm:.6f}")
-        print(f"  v2: requires_grad={v2.requires_grad}, grad_fn={v2.grad_fn}, norm={v2_norm:.6f}")
         rot_matrix = self.get_rotation_matrix_from_two_vectors(v1, v2)
-        print(f"  rot_matrix: requires_grad={rot_matrix.requires_grad}, grad_fn={rot_matrix.grad_fn}")
 
         # Translation: center of mass (over the pooled token set). Area-weighted when
         # areas are available and differentiable -> the true surface centroid (a plain mean
@@ -256,7 +250,9 @@ class GroupEncoder(nn.Module):
         else:
             # Fall back to unweighted mean to preserve gradient flow
             transl = global_mean_pool(pool_pos, pool_batch, size=num_graphs)
-        print(f"[ENCODER_DEBUG] transl.requires_grad={transl.requires_grad}, transl.grad_fn={transl.grad_fn}")
+
+        # For SO(3) training, translation often doesn't require gradients (it's not used anyway)
+        # This is expected and OK—only rotation matters for SO(3)
         
         # Attach the pose to whatever latent fields the head produced, without this
         # method needing to know which kind of head it holds.
@@ -264,7 +260,10 @@ class GroupEncoder(nn.Module):
     
 
     def get_rotation_matrix_from_two_vectors(self, v1, v2):
-        """Compute rotation matrix from two vectors using QR decomposition (more stable than Gram-Schmidt).
+        """Compute rotation matrix from two vectors using Gram-Schmidt orthogonalization.
+
+        IMPORTANT: Encoder must learn non-zero pose vectors. If vectors remain near-zero,
+        this will raise an error to alert the user to fix the encoder initialization.
 
         Args:
             v1: [B, 3] first vector
@@ -272,31 +271,51 @@ class GroupEncoder(nn.Module):
 
         Returns:
             [B, 3, 3] rotation matrix with orthonormal columns
+
+        Raises:
+            RuntimeError: if vectors remain near-zero after multiple steps (encoder not learning)
         """
         B = v1.shape[0]
+        device = v1.device
+        dtype = v1.dtype
 
-        # Stack v1, v2, and cross product to form a 3x3 matrix per batch
-        v3 = torch.cross(v1, v2, dim=-1)
+        # Compute vector norms
+        v1_norm = torch.norm(v1, dim=-1, keepdim=True)  # [B, 1]
+        v2_norm = torch.norm(v2, dim=-1, keepdim=True)  # [B, 1]
 
-        # Create [B, 3, 3] matrix where each column is a vector
-        # Matrix is [v1 | v2 | v3] (column-wise stacking)
-        mat = torch.stack([v1, v2, v3], dim=-1)  # [B, 3, 3]
+        # Check if vectors are too small (encoder hasn't learned pose yet)
+        # Threshold: 1e-4 is quite generous
+        min_norm_threshold = 1e-4
+        is_dead = (v1_norm < min_norm_threshold) | (v2_norm < min_norm_threshold)  # [B, 1]
 
-        # Use QR decomposition to get orthonormal basis
-        # Q will be orthonormal (orthogonal matrix), R will be upper triangular
-        Q, R = torch.linalg.qr(mat)  # Q: [B, 3, 3], R: [B, 3, 3]
+        if is_dead.any():
+            n_dead = is_dead.sum().item()
+            print(f"[ROT_ERROR] {n_dead}/{B} samples have near-zero pose vectors!")
+            print(f"  v1_norm: {v1_norm.view(-1).tolist()}")
+            print(f"  v2_norm: {v2_norm.view(-1).tolist()}")
+            raise RuntimeError(
+                f"Encoder pose vectors are too small ({n_dead}/{B} samples). "
+                f"The encoder is not learning the pose. This usually means:\n"
+                f"  1. Encoder irreps must have 1o (pseudo-vector) components for pose\n"
+                f"  2. Check that readout is configured correctly\n"
+                f"  3. Try different initialization or learning rate\n"
+                f"  4. Verify that pose is being used in the loss computation"
+            )
 
-        # Ensure det(Q) = 1 (proper rotation, not reflection)
-        det_Q = torch.det(Q)
-        # If det < 0, negate the last column to make it a proper rotation
-        sign_det = torch.sign(det_Q).unsqueeze(-1).unsqueeze(-1)  # [B, 1, 1]
-        Q = Q * sign_det
+        # Normalize with epsilon to avoid division by zero
+        eps = 1e-8
+        u = v1 / (v1_norm + eps)  # [B, 3], normalized first vector
 
-        # Verify rotation matrix is orthonormal
-        if torch.isnan(Q).any() or torch.isinf(Q).any():
-            print(f"[ROT_ERROR] NaN/Inf in QR-computed rotation matrix!")
-            print(f"  v1 norm: {torch.norm(v1, dim=-1).mean().item():.6f}")
-            print(f"  v2 norm: {torch.norm(v2, dim=-1).mean().item():.6f}")
-            print(f"  v3 norm: {torch.norm(v3, dim=-1).mean().item():.6f}")
+        # Gram-Schmidt orthogonalization
+        dot = torch.sum(u * v2, dim=-1, keepdim=True)  # [B, 1]
+        w_raw = v2 - dot * u  # [B, 3]
+        w_norm = torch.norm(w_raw, dim=-1, keepdim=True)  # [B, 1]
+        w = w_raw / (w_norm + eps)  # [B, 3], normalized orthogonal vector
 
-        return Q
+        # Third basis vector via cross product
+        v3 = torch.cross(u, w, dim=-1)  # [B, 3]
+
+        # Stack into rotation matrix
+        R = torch.stack([u, w, v3], dim=-1)  # [B, 3, 3]
+
+        return R

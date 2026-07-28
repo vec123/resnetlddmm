@@ -35,12 +35,12 @@ code:
     # Equivariant layer stack
     layers:
       - in_irreps: "1x0e"
-        target_irreps: "32x0e + 16x1e"
+        target_irreps: "32x0e + 16x1o"
         spatial_sh_lmax: 1
         interaction_sh_lmax: 3
 
-      - in_irreps: "32x0e + 16x1e"
-        target_irreps: "64x0e + 32x1e"
+      - in_irreps: "32x0e + 16x1o"
+        target_irreps: "64x0e + 32x1o"
         spatial_sh_lmax: 2
         interaction_sh_lmax: 3
 
@@ -67,8 +67,8 @@ loss:
   data_name: chamfer
   data_kwargs: {}
   direction: forward
-  sigma: 0.0001
-  kinetic_weight: 1.0
+  sigma: 0.1
+  kinetic_weight: 8.0
   code_reg_weight: 0.0
   weight_decay: 0.0001
   isometry_weight: 0.0
