@@ -157,9 +157,8 @@ def build(cfg: ExperimentCfg):
     # Build conditioning (shared across pair/cohort)
     # Orthogonal axes: position_aware (grid interpolation or broadcast?)
     #                  + conditioning_method (concat or FiLM modulation?)
-    # Note: encoder codes don't use conditioning (amortized embeddings from shape)
     conditioning = None
-    if cfg.code.kind not in ("none", "encoder"):
+    if cfg.code.kind not in ("none",):
         # Build conditioning based on position_aware + conditioning_method
         if cfg.code.position_aware:
             conditioning = Registry.create(

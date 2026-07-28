@@ -58,6 +58,10 @@ class UnidirectionalMappingError:
         else:
             self.last_subsample_vertices = self.last_full_vertices
 
+        # Broadcast template to match code batch size (cohort: template [1,N,3], code [B,n_z])
+        if template_points.shape[0] == 1 and code is not None and code.shape[0] > 1:
+            template_points = template_points.expand(code.shape[0], -1, -1)
+
         # Flow on (possibly subsampled) template points
         fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
@@ -70,7 +74,10 @@ class UnidirectionalMappingError:
 
         # Optionally compute full trajectory for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
-            self.last_fwd_traj_full = flow(template.points, code)
+            template_full = template.points
+            if template_full.shape[0] == 1 and code is not None and code.shape[0] > 1:
+                template_full = template_full.expand(code.shape[0], -1, -1)
+            self.last_fwd_traj_full = flow(template_full, code)
         else:
             self.last_fwd_traj_full = None
 
@@ -215,6 +222,12 @@ class BidirectionalMappingError:
         else:
             self.last_subsample_vertices = None
 
+        # Broadcast template/sample to match code batch size (cohort: one is [1,N,3], code is [B,n_z])
+        if template_points.shape[0] == 1 and code is not None and code.shape[0] > 1:
+            template_points = template_points.expand(code.shape[0], -1, -1)
+        if sample_points.shape[0] == 1 and code is not None and code.shape[0] > 1:
+            sample_points = sample_points.expand(code.shape[0], -1, -1)
+
         # Flow on (possibly subsampled) template and sample
         fwd = flow(template_points, code)
         bwd = flow.inverse(sample_points, code)
@@ -223,8 +236,14 @@ class BidirectionalMappingError:
 
         # Optionally compute full trajectories for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
-            self.last_fwd_traj_full = flow(template.points, code)
-            self.last_bwd_traj_full = flow.inverse(sample.points, code)
+            template_full = template.points
+            sample_full = sample.points
+            if template_full.shape[0] == 1 and code is not None and code.shape[0] > 1:
+                template_full = template_full.expand(code.shape[0], -1, -1)
+            if sample_full.shape[0] == 1 and code is not None and code.shape[0] > 1:
+                sample_full = sample_full.expand(code.shape[0], -1, -1)
+            self.last_fwd_traj_full = flow(template_full, code)
+            self.last_bwd_traj_full = flow.inverse(sample_full, code)
         else:
             self.last_fwd_traj_full = None
             self.last_bwd_traj_full = None

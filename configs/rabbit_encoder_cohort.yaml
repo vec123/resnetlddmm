@@ -1,6 +1,6 @@
 source: data/rabbit/cohort
 target: data/rabbit/T90.obj
-output_dir: outputs/rabbit_encoder_cohort_fix
+output_dir: outputs/rabbit_encoder_cohort_test5
 
 field:
   kind: time_varying
@@ -13,6 +13,7 @@ field:
 
 code:
   kind: encoder
+  conditioning_method: concat
   n_z: 10
 
   # Encoder configuration (equivariant graph neural network)
@@ -80,7 +81,7 @@ train:
   lr: 0.0001
   seed: 42
   log_every: 50
-  save_every: 100
+  save_every: 500
   val_every: 0
   export_shapes: 2
   export_strategy: sequential
