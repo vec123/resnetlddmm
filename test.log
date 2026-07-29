@@ -1,0 +1,2016 @@
+========== SLURM JOB INFO ==========
+Job ID: 2294377
+Node: node019
+GPU: GPU 0: Tesla T4 (UUID: GPU-055a4793-78ee-5524-f1f6-0422053b4050)
+Working dir: /gpfs/home/vbayer/resnetlddmm
+Python: /gpfs/home/vbayer/environments/geometric_env/bin/python
+====================================
+Config: configs/rabbit_encoder_cohort.yaml
+[GradientLogger] Logging to outputs/rabbit_encoder_cohort_so3_test/grad_logs
+Step    1/100001 | loss: 39.094997 | data: 0.781900 | kinetic: 0.000000
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_0/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_0/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 0: batch_ids=[0, 1], graph has 448 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 448
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1392 edges
+[EncoderGraphLogger] Saved graph sample 1: 218 nodes, 1596 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 439 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 228 nodes, 561 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_0
+Step   51/100001 | loss: 33.523842 | data: 0.607104 | kinetic: 0.396078
+Step  101/100001 | loss: 35.409779 | data: 0.668537 | kinetic: 0.247869
+Step  151/100001 | loss: 23.624554 | data: 0.450691 | kinetic: 0.136253
+Step  201/100001 | loss: 33.234829 | data: 0.619789 | kinetic: 0.280673
+Step  251/100001 | loss: 27.265530 | data: 0.498306 | kinetic: 0.293776
+Step  301/100001 | loss: 46.091370 | data: 0.890640 | kinetic: 0.194924
+Step  351/100001 | loss: 26.778160 | data: 0.487425 | kinetic: 0.300864
+Step  401/100001 | loss: 25.030193 | data: 0.466374 | kinetic: 0.213937
+Step  451/100001 | loss: 21.230667 | data: 0.399012 | kinetic: 0.160006
+Step  501/100001 | loss: 29.357859 | data: 0.542806 | kinetic: 0.277193
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 500: batch_ids=[0, 1], graph has 460 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 460
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1380 edges
+[EncoderGraphLogger] Saved graph sample 1: 230 nodes, 1764 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 444 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 240 nodes, 588 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_500
+Step  551/100001 | loss: 15.409422 | data: 0.288653 | kinetic: 0.122096
+Step  601/100001 | loss: 53.403015 | data: 1.001615 | kinetic: 0.415283
+Step  651/100001 | loss: 36.965469 | data: 0.706031 | kinetic: 0.207993
+Step  701/100001 | loss: 32.484280 | data: 0.618120 | kinetic: 0.197288
+Step  751/100001 | loss: 20.721775 | data: 0.371154 | kinetic: 0.270508
+Step  801/100001 | loss: 44.491936 | data: 0.852767 | kinetic: 0.231697
+Step  851/100001 | loss: 31.276373 | data: 0.594538 | kinetic: 0.193682
+Step  901/100001 | loss: 44.755260 | data: 0.863841 | kinetic: 0.195404
+Step  951/100001 | loss: 69.808304 | data: 1.375759 | kinetic: 0.127545
+Step 1001/100001 | loss: 30.264898 | data: 0.548715 | kinetic: 0.353647
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_1000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_1000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 1000: batch_ids=[0, 1], graph has 459 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 459
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1362 edges
+[EncoderGraphLogger] Saved graph sample 1: 231 nodes, 1808 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 428 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 241 nodes, 599 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_1000
+Step 1051/100001 | loss: 35.909706 | data: 0.679997 | kinetic: 0.238729
+Step 1101/100001 | loss: 43.377434 | data: 0.832799 | kinetic: 0.217185
+Step 1151/100001 | loss: 40.665180 | data: 0.762416 | kinetic: 0.318046
+Step 1201/100001 | loss: 21.999922 | data: 0.411762 | kinetic: 0.176481
+Step 1251/100001 | loss: 55.203556 | data: 1.064264 | kinetic: 0.248797
+Step 1301/100001 | loss: 27.889666 | data: 0.498991 | kinetic: 0.367516
+Step 1351/100001 | loss: 32.982372 | data: 0.609574 | kinetic: 0.312957
+Step 1401/100001 | loss: 26.357281 | data: 0.478251 | kinetic: 0.305590
+Step 1451/100001 | loss: 27.567873 | data: 0.525634 | kinetic: 0.160771
+Step 1501/100001 | loss: 24.161697 | data: 0.454446 | kinetic: 0.179926
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_1500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_1500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 1500: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1324 edges
+[EncoderGraphLogger] Saved graph sample 1: 230 nodes, 1864 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 433 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 240 nodes, 591 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_1500
+Step 1551/100001 | loss: 18.639254 | data: 0.336868 | kinetic: 0.224482
+Step 1601/100001 | loss: 18.258120 | data: 0.330075 | kinetic: 0.219293
+Step 1651/100001 | loss: 50.077938 | data: 0.980111 | kinetic: 0.134051
+Step 1701/100001 | loss: 13.482690 | data: 0.240069 | kinetic: 0.184903
+Step 1751/100001 | loss: 23.398270 | data: 0.426606 | kinetic: 0.258498
+Step 1801/100001 | loss: 31.210949 | data: 0.600819 | kinetic: 0.146250
+Step 1851/100001 | loss: 17.530119 | data: 0.313931 | kinetic: 0.229194
+Step 1901/100001 | loss: 42.301369 | data: 0.810418 | kinetic: 0.222560
+Step 1951/100001 | loss: 63.182232 | data: 1.247067 | kinetic: 0.103612
+Step 2001/100001 | loss: 46.682484 | data: 0.916307 | kinetic: 0.108393
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_2000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_2000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 2000: batch_ids=[0, 1], graph has 462 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 462
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1410 edges
+[EncoderGraphLogger] Saved graph sample 1: 232 nodes, 1836 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 440 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 242 nodes, 599 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_2000
+Step 2051/100001 | loss: 43.726894 | data: 0.842384 | kinetic: 0.200964
+Step 2101/100001 | loss: 39.719376 | data: 0.755702 | kinetic: 0.241781
+Step 2151/100001 | loss: 32.537613 | data: 0.610230 | kinetic: 0.253261
+Step 2201/100001 | loss: 11.309248 | data: 0.203920 | kinetic: 0.139159
+Step 2251/100001 | loss: 11.805029 | data: 0.215921 | kinetic: 0.126122
+Step 2301/100001 | loss: 40.623638 | data: 0.763712 | kinetic: 0.304757
+Step 2351/100001 | loss: 25.141357 | data: 0.470356 | kinetic: 0.202946
+Step 2401/100001 | loss: 25.475054 | data: 0.488710 | kinetic: 0.129943
+Step 2451/100001 | loss: 33.578632 | data: 0.640879 | kinetic: 0.191833
+Step 2501/100001 | loss: 38.390522 | data: 0.746864 | kinetic: 0.130918
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_2500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_2500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 2500: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1378 edges
+[EncoderGraphLogger] Saved graph sample 1: 229 nodes, 1820 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 436 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 239 nodes, 591 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_2500
+Step 2551/100001 | loss: 50.919765 | data: 0.988371 | kinetic: 0.187650
+Step 2601/100001 | loss: 32.319302 | data: 0.614807 | kinetic: 0.197372
+Step 2651/100001 | loss: 25.835867 | data: 0.474777 | kinetic: 0.262129
+Step 2701/100001 | loss: 33.786533 | data: 0.645477 | kinetic: 0.189086
+Step 2751/100001 | loss: 35.677349 | data: 0.687906 | kinetic: 0.160255
+Step 2801/100001 | loss: 30.471655 | data: 0.580019 | kinetic: 0.183838
+Step 2851/100001 | loss: 16.618742 | data: 0.301557 | kinetic: 0.192614
+Step 2901/100001 | loss: 38.497829 | data: 0.734591 | kinetic: 0.221035
+Step 2951/100001 | loss: 34.627674 | data: 0.656351 | kinetic: 0.226267
+Step 3001/100001 | loss: 29.987047 | data: 0.575227 | kinetic: 0.153211
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_3000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_3000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 3000: batch_ids=[0, 1], graph has 450 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 450
+[EncoderGraphLogger] Saved graph sample 0: 219 nodes, 1258 edges
+[EncoderGraphLogger] Saved graph sample 1: 231 nodes, 1792 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 229 nodes, 421 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 241 nodes, 589 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_3000
+Step 3051/100001 | loss: 49.220524 | data: 0.945402 | kinetic: 0.243801
+Step 3101/100001 | loss: 37.510170 | data: 0.725740 | kinetic: 0.152894
+Step 3151/100001 | loss: 53.241657 | data: 1.029324 | kinetic: 0.221931
+Step 3201/100001 | loss: 30.005280 | data: 0.566810 | kinetic: 0.208100
+Step 3251/100001 | loss: 39.438488 | data: 0.746376 | kinetic: 0.264958
+Step 3301/100001 | loss: 35.208340 | data: 0.663520 | kinetic: 0.254043
+Step 3351/100001 | loss: 17.165510 | data: 0.312570 | kinetic: 0.192127
+Step 3401/100001 | loss: 27.919006 | data: 0.520608 | kinetic: 0.236076
+Step 3451/100001 | loss: 42.686886 | data: 0.788109 | kinetic: 0.410176
+Step 3501/100001 | loss: 30.020657 | data: 0.576757 | kinetic: 0.147848
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_3500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_3500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 3500: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 233 nodes, 1430 edges
+[EncoderGraphLogger] Saved graph sample 1: 225 nodes, 1690 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 243 nodes, 443 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 235 nodes, 572 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_3500
+Step 3551/100001 | loss: 52.637001 | data: 1.031865 | kinetic: 0.130470
+Step 3601/100001 | loss: 56.186520 | data: 1.111902 | kinetic: 0.073930
+Step 3651/100001 | loss: 32.050018 | data: 0.588623 | kinetic: 0.327357
+Step 3701/100001 | loss: 17.225796 | data: 0.303662 | kinetic: 0.255336
+Step 3751/100001 | loss: 33.679638 | data: 0.642035 | kinetic: 0.197236
+Step 3801/100001 | loss: 35.158344 | data: 0.669557 | kinetic: 0.210063
+Step 3851/100001 | loss: 46.127373 | data: 0.893538 | kinetic: 0.181312
+Step 3901/100001 | loss: 43.635857 | data: 0.815109 | kinetic: 0.360049
+Step 3951/100001 | loss: 31.265770 | data: 0.595877 | kinetic: 0.183987
+Step 4001/100001 | loss: 50.518188 | data: 0.952720 | kinetic: 0.360274
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_4000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_4000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 4000: batch_ids=[0, 1], graph has 456 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 456
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1372 edges
+[EncoderGraphLogger] Saved graph sample 1: 227 nodes, 1714 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 436 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 237 nodes, 588 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_4000
+Step 4051/100001 | loss: 26.636723 | data: 0.487291 | kinetic: 0.284020
+Step 4101/100001 | loss: 39.279808 | data: 0.742549 | kinetic: 0.269042
+Step 4151/100001 | loss: 21.370916 | data: 0.380733 | kinetic: 0.291785
+Step 4201/100001 | loss: 46.270275 | data: 0.897428 | kinetic: 0.174859
+Step 4251/100001 | loss: 58.443192 | data: 1.147078 | kinetic: 0.136160
+Step 4301/100001 | loss: 22.190365 | data: 0.421137 | kinetic: 0.141692
+Step 4351/100001 | loss: 14.331496 | data: 0.266885 | kinetic: 0.123403
+Step 4401/100001 | loss: 32.671257 | data: 0.626654 | kinetic: 0.167319
+Step 4451/100001 | loss: 27.377834 | data: 0.497730 | kinetic: 0.311415
+Step 4501/100001 | loss: 36.197586 | data: 0.702500 | kinetic: 0.134074
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_4500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_4500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 4500: batch_ids=[0, 1], graph has 445 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 445
+[EncoderGraphLogger] Saved graph sample 0: 223 nodes, 1270 edges
+[EncoderGraphLogger] Saved graph sample 1: 222 nodes, 1672 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 233 nodes, 427 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 232 nodes, 567 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_4500
+Step 4551/100001 | loss: 71.321487 | data: 1.404482 | kinetic: 0.137173
+Step 4601/100001 | loss: 27.110077 | data: 0.517679 | kinetic: 0.153267
+Step 4651/100001 | loss: 23.388899 | data: 0.444652 | kinetic: 0.144536
+Step 4701/100001 | loss: 31.375170 | data: 0.577797 | kinetic: 0.310663
+Step 4751/100001 | loss: 42.555019 | data: 0.829560 | kinetic: 0.134631
+Step 4801/100001 | loss: 39.339123 | data: 0.757427 | kinetic: 0.183475
+Step 4851/100001 | loss: 26.259331 | data: 0.494244 | kinetic: 0.193392
+Step 4901/100001 | loss: 20.571484 | data: 0.384351 | kinetic: 0.169240
+Step 4951/100001 | loss: 47.906849 | data: 0.930045 | kinetic: 0.175573
+Step 5001/100001 | loss: 30.260927 | data: 0.571803 | kinetic: 0.208846
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_5000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_5000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 5000: batch_ids=[0, 1], graph has 453 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 453
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1398 edges
+[EncoderGraphLogger] Saved graph sample 1: 228 nodes, 1776 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 424 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 238 nodes, 579 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_5000
+Step 5051/100001 | loss: 39.845490 | data: 0.771552 | kinetic: 0.158487
+Step 5101/100001 | loss: 42.076851 | data: 0.815233 | kinetic: 0.164398
+Step 5151/100001 | loss: 39.702316 | data: 0.756557 | kinetic: 0.234309
+Step 5201/100001 | loss: 41.922382 | data: 0.790187 | kinetic: 0.301630
+Step 5251/100001 | loss: 46.971237 | data: 0.904028 | kinetic: 0.221229
+Step 5301/100001 | loss: 29.932827 | data: 0.574736 | kinetic: 0.149500
+Step 5351/100001 | loss: 30.611856 | data: 0.563755 | kinetic: 0.303016
+Step 5401/100001 | loss: 31.338879 | data: 0.588971 | kinetic: 0.236294
+Step 5451/100001 | loss: 33.884460 | data: 0.644409 | kinetic: 0.208001
+Step 5501/100001 | loss: 40.890820 | data: 0.794178 | kinetic: 0.147738
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_5500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_5500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 5500: batch_ids=[0, 1], graph has 459 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 459
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1376 edges
+[EncoderGraphLogger] Saved graph sample 1: 230 nodes, 1794 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 438 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 240 nodes, 593 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_5500
+Step 5551/100001 | loss: 33.884094 | data: 0.653597 | kinetic: 0.150534
+Step 5601/100001 | loss: 32.781502 | data: 0.604703 | kinetic: 0.318296
+Step 5651/100001 | loss: 27.785704 | data: 0.518400 | kinetic: 0.233214
+Step 5701/100001 | loss: 48.058105 | data: 0.923226 | kinetic: 0.237098
+Step 5751/100001 | loss: 23.577686 | data: 0.440890 | kinetic: 0.191648
+Step 5801/100001 | loss: 45.864334 | data: 0.888758 | kinetic: 0.178303
+Step 5851/100001 | loss: 24.819460 | data: 0.448518 | kinetic: 0.299193
+Step 5901/100001 | loss: 66.685722 | data: 1.315443 | kinetic: 0.114196
+Step 5951/100001 | loss: 42.627998 | data: 0.799009 | kinetic: 0.334696
+Step 6001/100001 | loss: 19.394167 | data: 0.359811 | kinetic: 0.175451
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_6000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_6000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 6000: batch_ids=[0, 1], graph has 446 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 446
+[EncoderGraphLogger] Saved graph sample 0: 220 nodes, 1294 edges
+[EncoderGraphLogger] Saved graph sample 1: 226 nodes, 1662 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 230 nodes, 416 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 236 nodes, 584 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_6000
+Step 6051/100001 | loss: 18.382204 | data: 0.330607 | kinetic: 0.231481
+Step 6101/100001 | loss: 49.956196 | data: 0.968705 | kinetic: 0.190118
+Step 6151/100001 | loss: 36.937378 | data: 0.711109 | kinetic: 0.172743
+Step 6201/100001 | loss: 55.048626 | data: 1.074203 | kinetic: 0.167306
+Step 6251/100001 | loss: 47.453625 | data: 0.917692 | kinetic: 0.196131
+Step 6301/100001 | loss: 23.829784 | data: 0.445417 | kinetic: 0.194865
+Step 6351/100001 | loss: 36.686993 | data: 0.698807 | kinetic: 0.218329
+Step 6401/100001 | loss: 11.902997 | data: 0.215530 | kinetic: 0.140811
+Step 6451/100001 | loss: 27.943954 | data: 0.528425 | kinetic: 0.190336
+Step 6501/100001 | loss: 45.797600 | data: 0.891794 | kinetic: 0.150985
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_6500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_6500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 6500: batch_ids=[0, 1], graph has 457 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 457
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1342 edges
+[EncoderGraphLogger] Saved graph sample 1: 232 nodes, 1830 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 426 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 242 nodes, 592 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_6500
+Step 6551/100001 | loss: 36.215317 | data: 0.686742 | kinetic: 0.234777
+Step 6601/100001 | loss: 29.425493 | data: 0.550592 | kinetic: 0.236987
+Step 6651/100001 | loss: 37.775185 | data: 0.721319 | kinetic: 0.213657
+Step 6701/100001 | loss: 21.259415 | data: 0.398988 | kinetic: 0.163752
+Step 6751/100001 | loss: 29.177910 | data: 0.557209 | kinetic: 0.164681
+Step 6801/100001 | loss: 32.874424 | data: 0.625908 | kinetic: 0.197378
+Step 6851/100001 | loss: 36.538414 | data: 0.710529 | kinetic: 0.126497
+Step 6901/100001 | loss: 35.643707 | data: 0.690259 | kinetic: 0.141343
+Step 6951/100001 | loss: 31.427271 | data: 0.601133 | kinetic: 0.171325
+Step 7001/100001 | loss: 37.293884 | data: 0.712155 | kinetic: 0.210768
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_7000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_7000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 7000: batch_ids=[0, 1], graph has 456 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 456
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1388 edges
+[EncoderGraphLogger] Saved graph sample 1: 227 nodes, 1728 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 428 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 237 nodes, 587 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_7000
+Step 7051/100001 | loss: 7.807534 | data: 0.141098 | kinetic: 0.094079
+Step 7101/100001 | loss: 42.570950 | data: 0.829902 | kinetic: 0.134480
+Step 7151/100001 | loss: 17.431662 | data: 0.318839 | kinetic: 0.186212
+Step 7201/100001 | loss: 27.303211 | data: 0.508848 | kinetic: 0.232600
+Step 7251/100001 | loss: 40.299828 | data: 0.778013 | kinetic: 0.174900
+Step 7301/100001 | loss: 33.333469 | data: 0.631786 | kinetic: 0.218021
+Step 7351/100001 | loss: 7.810202 | data: 0.138955 | kinetic: 0.107809
+Step 7401/100001 | loss: 66.559242 | data: 1.311535 | kinetic: 0.122812
+Step 7451/100001 | loss: 22.686249 | data: 0.432456 | kinetic: 0.132929
+Step 7501/100001 | loss: 36.382034 | data: 0.704180 | kinetic: 0.146630
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_7500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_7500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 7500: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1338 edges
+[EncoderGraphLogger] Saved graph sample 1: 233 nodes, 1868 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 426 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 243 nodes, 600 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_7500
+Step 7551/100001 | loss: 36.602123 | data: 0.683305 | kinetic: 0.304608
+Step 7601/100001 | loss: 35.182518 | data: 0.668905 | kinetic: 0.217161
+Step 7651/100001 | loss: 19.904518 | data: 0.373763 | kinetic: 0.152048
+Step 7701/100001 | loss: 62.591770 | data: 1.223816 | kinetic: 0.175122
+Step 7751/100001 | loss: 31.382700 | data: 0.597506 | kinetic: 0.188424
+Step 7801/100001 | loss: 34.092785 | data: 0.659107 | kinetic: 0.142180
+Step 7851/100001 | loss: 34.094723 | data: 0.655539 | kinetic: 0.164724
+Step 7901/100001 | loss: 38.476006 | data: 0.742342 | kinetic: 0.169864
+Step 7951/100001 | loss: 46.062267 | data: 0.891276 | kinetic: 0.187311
+Step 8001/100001 | loss: 35.368065 | data: 0.671547 | kinetic: 0.223838
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_8000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_8000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 8000: batch_ids=[0, 1], graph has 444 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 444
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1424 edges
+[EncoderGraphLogger] Saved graph sample 1: 214 nodes, 1484 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 437 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 224 nodes, 542 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_8000
+Step 8051/100001 | loss: 29.419849 | data: 0.550793 | kinetic: 0.235025
+Step 8101/100001 | loss: 37.822952 | data: 0.708477 | kinetic: 0.299885
+Step 8151/100001 | loss: 30.297398 | data: 0.572843 | kinetic: 0.206907
+Step 8201/100001 | loss: 25.208326 | data: 0.466010 | kinetic: 0.238478
+Step 8251/100001 | loss: 51.915920 | data: 1.000809 | kinetic: 0.234433
+Step 8301/100001 | loss: 14.401714 | data: 0.256925 | kinetic: 0.194433
+Step 8351/100001 | loss: 40.774452 | data: 0.770798 | kinetic: 0.279319
+Step 8401/100001 | loss: 38.621391 | data: 0.731397 | kinetic: 0.256445
+Step 8451/100001 | loss: 27.398428 | data: 0.506589 | kinetic: 0.258623
+Step 8501/100001 | loss: 15.915233 | data: 0.294585 | kinetic: 0.148248
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_8500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_8500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 8500: batch_ids=[0, 1], graph has 444 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 444
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1388 edges
+[EncoderGraphLogger] Saved graph sample 1: 219 nodes, 1636 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 427 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 229 nodes, 557 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_8500
+Step 8551/100001 | loss: 30.627096 | data: 0.586100 | kinetic: 0.165261
+Step 8601/100001 | loss: 19.991188 | data: 0.360992 | kinetic: 0.242697
+Step 8651/100001 | loss: 36.076973 | data: 0.689842 | kinetic: 0.198109
+Step 8701/100001 | loss: 24.080481 | data: 0.456232 | kinetic: 0.158613
+Step 8751/100001 | loss: 39.448074 | data: 0.758550 | kinetic: 0.190073
+Step 8801/100001 | loss: 38.554188 | data: 0.747600 | kinetic: 0.146774
+Step 8851/100001 | loss: 15.513866 | data: 0.276374 | kinetic: 0.211899
+Step 8901/100001 | loss: 43.392097 | data: 0.834834 | kinetic: 0.206300
+Step 8951/100001 | loss: 42.312260 | data: 0.823672 | kinetic: 0.141080
+Step 9001/100001 | loss: 39.168022 | data: 0.738838 | kinetic: 0.278267
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_9000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_9000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 9000: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 218 nodes, 1260 edges
+[EncoderGraphLogger] Saved graph sample 1: 234 nodes, 1806 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 228 nodes, 412 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 244 nodes, 597 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_9000
+Step 9051/100001 | loss: 18.258181 | data: 0.331706 | kinetic: 0.209109
+Step 9101/100001 | loss: 23.746077 | data: 0.441061 | kinetic: 0.211630
+Step 9151/100001 | loss: 16.062965 | data: 0.287666 | kinetic: 0.209959
+Step 9201/100001 | loss: 33.130882 | data: 0.628680 | kinetic: 0.212110
+Step 9251/100001 | loss: 46.587021 | data: 0.897864 | kinetic: 0.211729
+Step 9301/100001 | loss: 25.515779 | data: 0.467572 | kinetic: 0.267150
+Step 9351/100001 | loss: 23.068995 | data: 0.414187 | kinetic: 0.294954
+Step 9401/100001 | loss: 34.813168 | data: 0.644164 | kinetic: 0.325619
+Step 9451/100001 | loss: 45.653515 | data: 0.874199 | kinetic: 0.242945
+Step 9501/100001 | loss: 32.689213 | data: 0.621137 | kinetic: 0.204044
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_9500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_9500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 9500: batch_ids=[0, 1], graph has 450 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 450
+[EncoderGraphLogger] Saved graph sample 0: 218 nodes, 1212 edges
+[EncoderGraphLogger] Saved graph sample 1: 232 nodes, 1768 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 228 nodes, 412 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 242 nodes, 596 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_9500
+Step 9551/100001 | loss: 17.055843 | data: 0.303489 | kinetic: 0.235172
+Step 9601/100001 | loss: 35.542614 | data: 0.672012 | kinetic: 0.242751
+Step 9651/100001 | loss: 15.353155 | data: 0.271948 | kinetic: 0.219472
+Step 9701/100001 | loss: 37.197067 | data: 0.701333 | kinetic: 0.266300
+Step 9751/100001 | loss: 33.764385 | data: 0.607370 | kinetic: 0.424482
+Step 9801/100001 | loss: 29.904089 | data: 0.519192 | kinetic: 0.493061
+Step 9851/100001 | loss: 23.107922 | data: 0.437797 | kinetic: 0.152259
+Step 9901/100001 | loss: 23.369001 | data: 0.432525 | kinetic: 0.217841
+Step 9951/100001 | loss: 36.391529 | data: 0.694945 | kinetic: 0.205535
+Step 10001/100001 | loss: 40.363819 | data: 0.770628 | kinetic: 0.229052
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_10000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_10000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 10000: batch_ids=[0, 1], graph has 451 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 451
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1362 edges
+[EncoderGraphLogger] Saved graph sample 1: 226 nodes, 1726 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 425 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 236 nodes, 580 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_10000
+Step 10051/100001 | loss: 15.554082 | data: 0.280464 | kinetic: 0.191360
+Step 10101/100001 | loss: 21.007944 | data: 0.385036 | kinetic: 0.219520
+Step 10151/100001 | loss: 25.694294 | data: 0.483658 | kinetic: 0.188922
+Step 10201/100001 | loss: 15.335041 | data: 0.281026 | kinetic: 0.160465
+Step 10251/100001 | loss: 43.176468 | data: 0.833239 | kinetic: 0.189315
+Step 10301/100001 | loss: 25.749321 | data: 0.470130 | kinetic: 0.280350
+Step 10351/100001 | loss: 42.052158 | data: 0.815398 | kinetic: 0.160283
+Step 10401/100001 | loss: 22.552126 | data: 0.422060 | kinetic: 0.181139
+Step 10451/100001 | loss: 41.247665 | data: 0.784099 | kinetic: 0.255337
+Step 10501/100001 | loss: 32.111134 | data: 0.604949 | kinetic: 0.232963
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_10500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_10500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 10500: batch_ids=[0, 1], graph has 449 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 449
+[EncoderGraphLogger] Saved graph sample 0: 224 nodes, 1316 edges
+[EncoderGraphLogger] Saved graph sample 1: 225 nodes, 1734 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 234 nodes, 417 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 235 nodes, 580 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_10500
+Step 10551/100001 | loss: 13.811391 | data: 0.250423 | kinetic: 0.161279
+Step 10601/100001 | loss: 40.791340 | data: 0.782650 | kinetic: 0.207354
+Step 10651/100001 | loss: 54.483101 | data: 1.056109 | kinetic: 0.209707
+Step 10701/100001 | loss: 33.940804 | data: 0.637320 | kinetic: 0.259348
+Step 10751/100001 | loss: 33.112244 | data: 0.620840 | kinetic: 0.258780
+Step 10801/100001 | loss: 48.316578 | data: 0.927884 | kinetic: 0.240298
+Step 10851/100001 | loss: 23.280361 | data: 0.433870 | kinetic: 0.198358
+Step 10901/100001 | loss: 43.058346 | data: 0.816475 | kinetic: 0.279327
+Step 10951/100001 | loss: 50.068550 | data: 0.965470 | kinetic: 0.224380
+Step 11001/100001 | loss: 44.247513 | data: 0.859309 | kinetic: 0.160255
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_11000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_11000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 11000: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1426 edges
+[EncoderGraphLogger] Saved graph sample 1: 222 nodes, 1688 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 433 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 232 nodes, 575 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_11000
+Step 11051/100001 | loss: 35.722889 | data: 0.683730 | kinetic: 0.192048
+Step 11101/100001 | loss: 16.683327 | data: 0.298137 | kinetic: 0.222057
+Step 11151/100001 | loss: 49.933750 | data: 0.974027 | kinetic: 0.154048
+Step 11201/100001 | loss: 26.964617 | data: 0.502925 | kinetic: 0.227295
+Step 11251/100001 | loss: 34.032215 | data: 0.639406 | kinetic: 0.257738
+Step 11301/100001 | loss: 28.112646 | data: 0.533722 | kinetic: 0.178316
+Step 11351/100001 | loss: 46.324997 | data: 0.886924 | kinetic: 0.247350
+Step 11401/100001 | loss: 48.808361 | data: 0.947788 | kinetic: 0.177370
+Step 11451/100001 | loss: 40.058792 | data: 0.768689 | kinetic: 0.203043
+Step 11501/100001 | loss: 15.350060 | data: 0.277467 | kinetic: 0.184586
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_11500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_11500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 11500: batch_ids=[0, 1], graph has 456 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 456
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1370 edges
+[EncoderGraphLogger] Saved graph sample 1: 228 nodes, 1810 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 433 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 238 nodes, 584 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_11500
+Step 11551/100001 | loss: 32.715446 | data: 0.611305 | kinetic: 0.268774
+Step 11601/100001 | loss: 20.538851 | data: 0.377278 | kinetic: 0.209368
+Step 11651/100001 | loss: 52.429512 | data: 1.019524 | kinetic: 0.181661
+Step 11701/100001 | loss: 35.550636 | data: 0.675483 | kinetic: 0.222061
+Step 11751/100001 | loss: 28.829977 | data: 0.544341 | kinetic: 0.201616
+Step 11801/100001 | loss: 27.373629 | data: 0.521712 | kinetic: 0.161004
+Step 11851/100001 | loss: 12.303740 | data: 0.216946 | kinetic: 0.182054
+Step 11901/100001 | loss: 46.721073 | data: 0.900516 | kinetic: 0.211911
+Step 11951/100001 | loss: 18.283251 | data: 0.329071 | kinetic: 0.228713
+Step 12001/100001 | loss: 44.964397 | data: 0.859246 | kinetic: 0.250262
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_12000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_12000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 12000: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1398 edges
+[EncoderGraphLogger] Saved graph sample 1: 226 nodes, 1742 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 422 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 236 nodes, 582 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_12000
+Step 12051/100001 | loss: 39.814114 | data: 0.743333 | kinetic: 0.330934
+Step 12101/100001 | loss: 19.027559 | data: 0.344480 | kinetic: 0.225446
+Step 12151/100001 | loss: 39.761711 | data: 0.762369 | kinetic: 0.205406
+Step 12201/100001 | loss: 32.954369 | data: 0.629856 | kinetic: 0.182697
+Step 12251/100001 | loss: 33.316959 | data: 0.637089 | kinetic: 0.182812
+Step 12301/100001 | loss: 14.979445 | data: 0.271635 | kinetic: 0.174710
+Step 12351/100001 | loss: 49.648834 | data: 0.959056 | kinetic: 0.212006
+Step 12401/100001 | loss: 16.892527 | data: 0.305924 | kinetic: 0.199540
+Step 12451/100001 | loss: 52.739571 | data: 1.019438 | kinetic: 0.220960
+Step 12501/100001 | loss: 42.101910 | data: 0.815329 | kinetic: 0.166931
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_12500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_12500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 12500: batch_ids=[0, 1], graph has 463 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 463
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1312 edges
+[EncoderGraphLogger] Saved graph sample 1: 235 nodes, 1836 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 435 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 245 nodes, 608 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_12500
+Step 12551/100001 | loss: 44.624748 | data: 0.850563 | kinetic: 0.262072
+Step 12601/100001 | loss: 29.655165 | data: 0.565221 | kinetic: 0.174262
+Step 12651/100001 | loss: 36.247162 | data: 0.696692 | kinetic: 0.176570
+Step 12701/100001 | loss: 49.040195 | data: 0.946743 | kinetic: 0.212883
+Step 12751/100001 | loss: 17.235476 | data: 0.308435 | kinetic: 0.226716
+Step 12801/100001 | loss: 47.050430 | data: 0.915351 | kinetic: 0.160360
+Step 12851/100001 | loss: 15.161148 | data: 0.260845 | kinetic: 0.264860
+Step 12901/100001 | loss: 29.638714 | data: 0.564751 | kinetic: 0.175145
+Step 12951/100001 | loss: 27.192261 | data: 0.513054 | kinetic: 0.192443
+Step 13001/100001 | loss: 37.746460 | data: 0.729369 | kinetic: 0.159752
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_13000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_13000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 13000: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1352 edges
+[EncoderGraphLogger] Saved graph sample 1: 229 nodes, 1776 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 430 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 239 nodes, 590 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_13000
+Step 13051/100001 | loss: 55.044628 | data: 1.072192 | kinetic: 0.179376
+Step 13101/100001 | loss: 34.510014 | data: 0.657854 | kinetic: 0.202161
+Step 13151/100001 | loss: 52.234894 | data: 1.009375 | kinetic: 0.220766
+Step 13201/100001 | loss: 18.080481 | data: 0.327256 | kinetic: 0.214710
+Step 13251/100001 | loss: 36.304630 | data: 0.670677 | kinetic: 0.346348
+Step 13301/100001 | loss: 31.959145 | data: 0.600589 | kinetic: 0.241209
+Step 13351/100001 | loss: 47.014282 | data: 0.906669 | kinetic: 0.210104
+Step 13401/100001 | loss: 36.065201 | data: 0.697735 | kinetic: 0.147309
+Step 13451/100001 | loss: 36.727753 | data: 0.702971 | kinetic: 0.197401
+Step 13501/100001 | loss: 9.033335 | data: 0.150879 | kinetic: 0.186172
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_13500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_13500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 13500: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1386 edges
+[EncoderGraphLogger] Saved graph sample 1: 230 nodes, 1750 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 429 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 240 nodes, 590 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_13500
+Step 13551/100001 | loss: 25.109735 | data: 0.462931 | kinetic: 0.245399
+Step 13601/100001 | loss: 21.897696 | data: 0.408230 | kinetic: 0.185772
+Step 13651/100001 | loss: 27.948210 | data: 0.538832 | kinetic: 0.125826
+Step 13701/100001 | loss: 21.161531 | data: 0.389505 | kinetic: 0.210788
+Step 13751/100001 | loss: 23.340225 | data: 0.431987 | kinetic: 0.217607
+Step 13801/100001 | loss: 15.366971 | data: 0.264345 | kinetic: 0.268716
+Step 13851/100001 | loss: 25.886261 | data: 0.468800 | kinetic: 0.305780
+Step 13901/100001 | loss: 29.337622 | data: 0.537243 | kinetic: 0.309433
+Step 13951/100001 | loss: 32.000408 | data: 0.606460 | kinetic: 0.209676
+Step 14001/100001 | loss: 40.985722 | data: 0.784420 | kinetic: 0.220593
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_14000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_14000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 14000: batch_ids=[0, 1], graph has 449 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 449
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1376 edges
+[EncoderGraphLogger] Saved graph sample 1: 220 nodes, 1626 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 434 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 230 nodes, 567 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_14000
+Step 14051/100001 | loss: 38.255955 | data: 0.733764 | kinetic: 0.195971
+Step 14101/100001 | loss: 25.903669 | data: 0.476218 | kinetic: 0.261596
+Step 14151/100001 | loss: 34.177605 | data: 0.650917 | kinetic: 0.203967
+Step 14201/100001 | loss: 11.773492 | data: 0.197585 | kinetic: 0.236777
+Step 14251/100001 | loss: 11.777534 | data: 0.209491 | kinetic: 0.162874
+Step 14301/100001 | loss: 40.730324 | data: 0.775260 | kinetic: 0.245918
+Step 14351/100001 | loss: 32.387901 | data: 0.593451 | kinetic: 0.339419
+Step 14401/100001 | loss: 40.225689 | data: 0.775353 | kinetic: 0.182252
+Step 14451/100001 | loss: 35.758892 | data: 0.677338 | kinetic: 0.236497
+Step 14501/100001 | loss: 23.294250 | data: 0.414136 | kinetic: 0.323432
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_14500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_14500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 14500: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1388 edges
+[EncoderGraphLogger] Saved graph sample 1: 223 nodes, 1692 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 441 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 233 nodes, 575 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_14500
+Step 14551/100001 | loss: 33.808853 | data: 0.629475 | kinetic: 0.291887
+Step 14601/100001 | loss: 9.892473 | data: 0.166056 | kinetic: 0.198706
+Step 14651/100001 | loss: 34.941998 | data: 0.661779 | kinetic: 0.231633
+Step 14701/100001 | loss: 40.194386 | data: 0.756313 | kinetic: 0.297339
+Step 14751/100001 | loss: 16.975517 | data: 0.302595 | kinetic: 0.230724
+Step 14801/100001 | loss: 29.949917 | data: 0.567720 | kinetic: 0.195492
+Step 14851/100001 | loss: 28.130259 | data: 0.519755 | kinetic: 0.267813
+Step 14901/100001 | loss: 17.026129 | data: 0.308453 | kinetic: 0.200434
+Step 14951/100001 | loss: 45.941223 | data: 0.884013 | kinetic: 0.217570
+Step 15001/100001 | loss: 31.782879 | data: 0.608195 | kinetic: 0.171639
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_15000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_15000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 15000: batch_ids=[0, 1], graph has 450 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 450
+[EncoderGraphLogger] Saved graph sample 0: 231 nodes, 1398 edges
+[EncoderGraphLogger] Saved graph sample 1: 219 nodes, 1586 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 241 nodes, 438 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 229 nodes, 575 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_15000
+Step 15051/100001 | loss: 12.586802 | data: 0.216687 | kinetic: 0.219055
+Step 15101/100001 | loss: 28.709404 | data: 0.546216 | kinetic: 0.174826
+Step 15151/100001 | loss: 32.643047 | data: 0.613430 | kinetic: 0.246445
+Step 15201/100001 | loss: 30.343765 | data: 0.576414 | kinetic: 0.190383
+Step 15251/100001 | loss: 31.948427 | data: 0.599388 | kinetic: 0.247380
+Step 15301/100001 | loss: 22.624283 | data: 0.407035 | kinetic: 0.284069
+Step 15351/100001 | loss: 42.983135 | data: 0.824047 | kinetic: 0.222600
+Step 15401/100001 | loss: 69.124306 | data: 1.356929 | kinetic: 0.159735
+Step 15451/100001 | loss: 23.928791 | data: 0.444267 | kinetic: 0.214432
+Step 15501/100001 | loss: 31.487122 | data: 0.598433 | kinetic: 0.195684
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_15500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_15500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 15500: batch_ids=[0, 1], graph has 454 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 454
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1328 edges
+[EncoderGraphLogger] Saved graph sample 1: 228 nodes, 1778 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 431 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 238 nodes, 583 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_15500
+Step 15551/100001 | loss: 34.385410 | data: 0.655071 | kinetic: 0.203982
+Step 15601/100001 | loss: 29.702164 | data: 0.556276 | kinetic: 0.236046
+Step 15651/100001 | loss: 25.760380 | data: 0.456385 | kinetic: 0.367644
+Step 15701/100001 | loss: 33.126877 | data: 0.622160 | kinetic: 0.252362
+Step 15751/100001 | loss: 32.667862 | data: 0.617235 | kinetic: 0.225767
+Step 15801/100001 | loss: 15.412484 | data: 0.270327 | kinetic: 0.237016
+Step 15851/100001 | loss: 28.466965 | data: 0.539564 | kinetic: 0.186093
+Step 15901/100001 | loss: 37.388325 | data: 0.712525 | kinetic: 0.220262
+Step 15951/100001 | loss: 14.815468 | data: 0.264330 | kinetic: 0.199870
+Step 16001/100001 | loss: 44.723286 | data: 0.861981 | kinetic: 0.203031
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_16000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_16000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 16000: batch_ids=[0, 1], graph has 459 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 459
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1368 edges
+[EncoderGraphLogger] Saved graph sample 1: 232 nodes, 1786 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 433 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 242 nodes, 591 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_16000
+Step 16051/100001 | loss: 21.229595 | data: 0.391920 | kinetic: 0.204199
+Step 16101/100001 | loss: 51.110420 | data: 0.986633 | kinetic: 0.222348
+Step 16151/100001 | loss: 35.953457 | data: 0.684549 | kinetic: 0.215751
+Step 16201/100001 | loss: 31.935343 | data: 0.600439 | kinetic: 0.239174
+Step 16251/100001 | loss: 19.205900 | data: 0.358241 | kinetic: 0.161731
+Step 16301/100001 | loss: 50.198170 | data: 0.956294 | kinetic: 0.297935
+Step 16351/100001 | loss: 17.733950 | data: 0.316263 | kinetic: 0.240103
+Step 16401/100001 | loss: 17.518700 | data: 0.308634 | kinetic: 0.260873
+Step 16451/100001 | loss: 17.552505 | data: 0.311985 | kinetic: 0.244156
+Step 16501/100001 | loss: 27.651464 | data: 0.519815 | kinetic: 0.207588
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_16500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_16500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 16500: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1408 edges
+[EncoderGraphLogger] Saved graph sample 1: 223 nodes, 1688 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 436 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 233 nodes, 579 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_16500
+Step 16551/100001 | loss: 42.487808 | data: 0.822693 | kinetic: 0.169143
+Step 16601/100001 | loss: 38.316494 | data: 0.719673 | kinetic: 0.291605
+Step 16651/100001 | loss: 22.911947 | data: 0.437185 | kinetic: 0.131589
+Step 16701/100001 | loss: 28.181873 | data: 0.533560 | kinetic: 0.187981
+Step 16751/100001 | loss: 46.786777 | data: 0.907882 | kinetic: 0.174085
+Step 16801/100001 | loss: 30.547668 | data: 0.574644 | kinetic: 0.226932
+Step 16851/100001 | loss: 11.899485 | data: 0.200642 | kinetic: 0.233421
+Step 16901/100001 | loss: 17.668718 | data: 0.323042 | kinetic: 0.189575
+Step 16951/100001 | loss: 21.090717 | data: 0.387621 | kinetic: 0.213711
+Step 17001/100001 | loss: 41.411667 | data: 0.795293 | kinetic: 0.205874
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_17000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_17000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 17000: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1366 edges
+[EncoderGraphLogger] Saved graph sample 1: 224 nodes, 1712 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 430 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 234 nodes, 574 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_17000
+Step 17051/100001 | loss: 33.983547 | data: 0.647524 | kinetic: 0.200919
+Step 17101/100001 | loss: 29.774706 | data: 0.559697 | kinetic: 0.223732
+Step 17151/100001 | loss: 41.959312 | data: 0.806879 | kinetic: 0.201919
+Step 17201/100001 | loss: 47.761471 | data: 0.919155 | kinetic: 0.225465
+Step 17251/100001 | loss: 11.129777 | data: 0.186872 | kinetic: 0.223271
+Step 17301/100001 | loss: 31.883440 | data: 0.581638 | kinetic: 0.350192
+Step 17351/100001 | loss: 27.927666 | data: 0.528335 | kinetic: 0.188864
+Step 17401/100001 | loss: 27.917833 | data: 0.512902 | kinetic: 0.284093
+Step 17451/100001 | loss: 14.668165 | data: 0.247915 | kinetic: 0.284049
+Step 17501/100001 | loss: 10.717013 | data: 0.181408 | kinetic: 0.205825
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_17500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_17500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 17500: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 223 nodes, 1342 edges
+[EncoderGraphLogger] Saved graph sample 1: 235 nodes, 1848 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 233 nodes, 422 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 245 nodes, 602 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_17500
+Step 17551/100001 | loss: 41.456261 | data: 0.782354 | kinetic: 0.292318
+Step 17601/100001 | loss: 22.381668 | data: 0.416442 | kinetic: 0.194946
+Step 17651/100001 | loss: 19.409451 | data: 0.345768 | kinetic: 0.265131
+Step 17701/100001 | loss: 31.883850 | data: 0.593862 | kinetic: 0.273843
+Step 17751/100001 | loss: 32.658047 | data: 0.615032 | kinetic: 0.238309
+Step 17801/100001 | loss: 38.538239 | data: 0.733443 | kinetic: 0.233263
+Step 17851/100001 | loss: 12.341881 | data: 0.201923 | kinetic: 0.280719
+Step 17901/100001 | loss: 30.779455 | data: 0.571499 | kinetic: 0.275563
+Step 17951/100001 | loss: 34.172901 | data: 0.651505 | kinetic: 0.199709
+Step 18001/100001 | loss: 19.024282 | data: 0.337842 | kinetic: 0.266525
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_18000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_18000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 18000: batch_ids=[0, 1], graph has 450 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 450
+[EncoderGraphLogger] Saved graph sample 0: 231 nodes, 1436 edges
+[EncoderGraphLogger] Saved graph sample 1: 219 nodes, 1610 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 241 nodes, 439 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 229 nodes, 559 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_18000
+Step 18051/100001 | loss: 31.910105 | data: 0.602784 | kinetic: 0.221361
+Step 18101/100001 | loss: 11.827427 | data: 0.208742 | kinetic: 0.173789
+Step 18151/100001 | loss: 21.479002 | data: 0.397196 | kinetic: 0.202400
+Step 18201/100001 | loss: 27.911076 | data: 0.525571 | kinetic: 0.204065
+Step 18251/100001 | loss: 32.665703 | data: 0.625976 | kinetic: 0.170865
+Step 18301/100001 | loss: 32.179562 | data: 0.609459 | kinetic: 0.213329
+Step 18351/100001 | loss: 11.316339 | data: 0.189253 | kinetic: 0.231709
+Step 18401/100001 | loss: 28.588997 | data: 0.539061 | kinetic: 0.204495
+Step 18451/100001 | loss: 36.584534 | data: 0.694145 | kinetic: 0.234658
+Step 18501/100001 | loss: 51.576878 | data: 0.998572 | kinetic: 0.206037
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_18500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_18500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 18500: batch_ids=[0, 1], graph has 457 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 457
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1364 edges
+[EncoderGraphLogger] Saved graph sample 1: 231 nodes, 1824 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 420 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 241 nodes, 590 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_18500
+Step 18551/100001 | loss: 28.500341 | data: 0.539280 | kinetic: 0.192043
+Step 18601/100001 | loss: 26.475080 | data: 0.491557 | kinetic: 0.237152
+Step 18651/100001 | loss: 27.763414 | data: 0.532772 | kinetic: 0.140603
+Step 18701/100001 | loss: 21.341938 | data: 0.399332 | kinetic: 0.171920
+Step 18751/100001 | loss: 33.908924 | data: 0.630951 | kinetic: 0.295170
+Step 18801/100001 | loss: 10.993923 | data: 0.186264 | kinetic: 0.210091
+Step 18851/100001 | loss: 28.917225 | data: 0.536373 | kinetic: 0.262321
+Step 18901/100001 | loss: 9.832371 | data: 0.167066 | kinetic: 0.184883
+Step 18951/100001 | loss: 30.971121 | data: 0.576069 | kinetic: 0.270957
+Step 19001/100001 | loss: 29.779922 | data: 0.562223 | kinetic: 0.208594
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_19000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_19000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 19000: batch_ids=[0, 1], graph has 453 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 453
+[EncoderGraphLogger] Saved graph sample 0: 223 nodes, 1334 edges
+[EncoderGraphLogger] Saved graph sample 1: 230 nodes, 1824 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 233 nodes, 417 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 240 nodes, 590 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_19000
+Step 19051/100001 | loss: 20.857388 | data: 0.376495 | kinetic: 0.254081
+Step 19101/100001 | loss: 29.613417 | data: 0.564654 | kinetic: 0.172591
+Step 19151/100001 | loss: 12.278895 | data: 0.207270 | kinetic: 0.239426
+Step 19201/100001 | loss: 16.176294 | data: 0.292686 | kinetic: 0.192752
+Step 19251/100001 | loss: 46.361374 | data: 0.894073 | kinetic: 0.207214
+Step 19301/100001 | loss: 15.266569 | data: 0.273354 | kinetic: 0.199859
+Step 19351/100001 | loss: 22.690235 | data: 0.422401 | kinetic: 0.196274
+Step 19401/100001 | loss: 22.353039 | data: 0.417261 | kinetic: 0.186249
+Step 19451/100001 | loss: 21.520590 | data: 0.392057 | kinetic: 0.239716
+Step 19501/100001 | loss: 21.235001 | data: 0.387666 | kinetic: 0.231462
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_19500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_19500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 19500: batch_ids=[0, 1], graph has 441 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 441
+[EncoderGraphLogger] Saved graph sample 0: 224 nodes, 1330 edges
+[EncoderGraphLogger] Saved graph sample 1: 217 nodes, 1584 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 234 nodes, 428 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 227 nodes, 559 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_19500
+Step 19551/100001 | loss: 13.267871 | data: 0.230044 | kinetic: 0.220707
+Step 19601/100001 | loss: 35.825092 | data: 0.668269 | kinetic: 0.301454
+Step 19651/100001 | loss: 19.085007 | data: 0.346597 | kinetic: 0.219396
+Step 19701/100001 | loss: 21.498226 | data: 0.376328 | kinetic: 0.335228
+Step 19751/100001 | loss: 40.170284 | data: 0.765126 | kinetic: 0.239251
+Step 19801/100001 | loss: 35.379349 | data: 0.675112 | kinetic: 0.202969
+Step 19851/100001 | loss: 17.792469 | data: 0.319125 | kinetic: 0.229527
+Step 19901/100001 | loss: 24.017736 | data: 0.445353 | kinetic: 0.218760
+Step 19951/100001 | loss: 24.342663 | data: 0.450203 | kinetic: 0.229066
+Step 20001/100001 | loss: 58.527996 | data: 1.128521 | kinetic: 0.262743
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_20000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_20000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 20000: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1390 edges
+[EncoderGraphLogger] Saved graph sample 1: 231 nodes, 1782 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 427 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 241 nodes, 598 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_20000
+Step 20051/100001 | loss: 47.514030 | data: 0.914445 | kinetic: 0.223975
+Step 20101/100001 | loss: 45.184444 | data: 0.865122 | kinetic: 0.241044
+Step 20151/100001 | loss: 17.273512 | data: 0.308323 | kinetic: 0.232171
+Step 20201/100001 | loss: 30.145144 | data: 0.561975 | kinetic: 0.255800
+Step 20251/100001 | loss: 34.461498 | data: 0.654113 | kinetic: 0.219480
+Step 20301/100001 | loss: 16.521006 | data: 0.296676 | kinetic: 0.210902
+Step 20351/100001 | loss: 16.213156 | data: 0.286936 | kinetic: 0.233295
+Step 20401/100001 | loss: 17.537060 | data: 0.309338 | kinetic: 0.258770
+Step 20451/100001 | loss: 24.759176 | data: 0.464530 | kinetic: 0.191585
+Step 20501/100001 | loss: 13.994227 | data: 0.240093 | kinetic: 0.248695
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_20500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_20500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 20500: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1356 edges
+[EncoderGraphLogger] Saved graph sample 1: 227 nodes, 1744 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 435 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 237 nodes, 581 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_20500
+Step 20551/100001 | loss: 28.161165 | data: 0.528444 | kinetic: 0.217373
+Step 20601/100001 | loss: 13.190135 | data: 0.221984 | kinetic: 0.261364
+Step 20651/100001 | loss: 28.043381 | data: 0.509411 | kinetic: 0.321601
+Step 20701/100001 | loss: 17.028212 | data: 0.306703 | kinetic: 0.211633
+Step 20751/100001 | loss: 14.562393 | data: 0.257782 | kinetic: 0.209159
+Step 20801/100001 | loss: 15.849902 | data: 0.285806 | kinetic: 0.194948
+Step 20851/100001 | loss: 34.532494 | data: 0.659415 | kinetic: 0.195221
+Step 20901/100001 | loss: 49.477531 | data: 0.950849 | kinetic: 0.241885
+Step 20951/100001 | loss: 37.741287 | data: 0.719362 | kinetic: 0.221649
+Step 21001/100001 | loss: 49.942802 | data: 0.960727 | kinetic: 0.238308
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_21000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_21000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 21000: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1426 edges
+[EncoderGraphLogger] Saved graph sample 1: 231 nodes, 1814 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 429 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 241 nodes, 594 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_21000
+Step 21051/100001 | loss: 20.701502 | data: 0.366855 | kinetic: 0.294846
+Step 21101/100001 | loss: 29.241179 | data: 0.542714 | kinetic: 0.263185
+Step 21151/100001 | loss: 35.994331 | data: 0.676636 | kinetic: 0.270315
+Step 21201/100001 | loss: 39.093689 | data: 0.739226 | kinetic: 0.266546
+Step 21251/100001 | loss: 28.219416 | data: 0.514303 | kinetic: 0.313033
+Step 21301/100001 | loss: 27.516376 | data: 0.511260 | kinetic: 0.244173
+Step 21351/100001 | loss: 14.058114 | data: 0.244292 | kinetic: 0.230439
+Step 21401/100001 | loss: 15.461782 | data: 0.276074 | kinetic: 0.207263
+Step 21451/100001 | loss: 34.804619 | data: 0.670044 | kinetic: 0.162801
+Step 21501/100001 | loss: 27.156397 | data: 0.492794 | kinetic: 0.314589
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_21500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_21500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 21500: batch_ids=[0, 1], graph has 451 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 451
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1344 edges
+[EncoderGraphLogger] Saved graph sample 1: 224 nodes, 1694 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 431 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 234 nodes, 572 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_21500
+Step 21551/100001 | loss: 30.275415 | data: 0.567426 | kinetic: 0.238015
+Step 21601/100001 | loss: 24.300976 | data: 0.445145 | kinetic: 0.255468
+Step 21651/100001 | loss: 42.504570 | data: 0.805322 | kinetic: 0.279812
+Step 21701/100001 | loss: 25.456890 | data: 0.465420 | kinetic: 0.273236
+Step 21751/100001 | loss: 48.768330 | data: 0.936345 | kinetic: 0.243885
+Step 21801/100001 | loss: 26.244549 | data: 0.482768 | kinetic: 0.263270
+Step 21851/100001 | loss: 29.977106 | data: 0.566686 | kinetic: 0.205351
+Step 21901/100001 | loss: 16.600342 | data: 0.287938 | kinetic: 0.275430
+Step 21951/100001 | loss: 38.584610 | data: 0.722175 | kinetic: 0.309482
+Step 22001/100001 | loss: 25.239233 | data: 0.462788 | kinetic: 0.262481
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_22000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_22000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 22000: batch_ids=[0, 1], graph has 440 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 440
+[EncoderGraphLogger] Saved graph sample 0: 230 nodes, 1428 edges
+[EncoderGraphLogger] Saved graph sample 1: 210 nodes, 1564 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 240 nodes, 436 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 220 nodes, 532 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_22000
+Step 22051/100001 | loss: 34.852726 | data: 0.656916 | kinetic: 0.250863
+Step 22101/100001 | loss: 32.555164 | data: 0.604525 | kinetic: 0.291114
+Step 22151/100001 | loss: 24.805214 | data: 0.460750 | kinetic: 0.220961
+Step 22201/100001 | loss: 39.864872 | data: 0.761379 | kinetic: 0.224492
+Step 22251/100001 | loss: 34.927254 | data: 0.660305 | kinetic: 0.239001
+Step 22301/100001 | loss: 19.652653 | data: 0.350202 | kinetic: 0.267820
+Step 22351/100001 | loss: 40.793278 | data: 0.777215 | kinetic: 0.241569
+Step 22401/100001 | loss: 24.682735 | data: 0.458169 | kinetic: 0.221784
+Step 22451/100001 | loss: 32.377434 | data: 0.594837 | kinetic: 0.329451
+Step 22501/100001 | loss: 26.968458 | data: 0.500010 | kinetic: 0.245993
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_22500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_22500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 22500: batch_ids=[0, 1], graph has 452 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 452
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1340 edges
+[EncoderGraphLogger] Saved graph sample 1: 224 nodes, 1678 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 435 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 234 nodes, 568 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_22500
+Step 22551/100001 | loss: 21.211679 | data: 0.387024 | kinetic: 0.232562
+Step 22601/100001 | loss: 24.112919 | data: 0.448217 | kinetic: 0.212760
+Step 22651/100001 | loss: 16.529770 | data: 0.301685 | kinetic: 0.180690
+Step 22701/100001 | loss: 19.923885 | data: 0.367666 | kinetic: 0.192574
+Step 22751/100001 | loss: 17.975925 | data: 0.316344 | kinetic: 0.269842
+Step 22801/100001 | loss: 41.736904 | data: 0.797552 | kinetic: 0.232412
+Step 22851/100001 | loss: 34.802692 | data: 0.658020 | kinetic: 0.237709
+Step 22901/100001 | loss: 39.640556 | data: 0.755244 | kinetic: 0.234795
+Step 22951/100001 | loss: 44.489849 | data: 0.858920 | kinetic: 0.192984
+Step 23001/100001 | loss: 24.515915 | data: 0.453277 | kinetic: 0.231507
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_23000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_23000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 23000: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1414 edges
+[EncoderGraphLogger] Saved graph sample 1: 229 nodes, 1784 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 441 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 239 nodes, 587 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_23000
+Step 23051/100001 | loss: 12.311619 | data: 0.209652 | kinetic: 0.228629
+Step 23101/100001 | loss: 20.542242 | data: 0.369829 | kinetic: 0.256347
+Step 23151/100001 | loss: 23.778824 | data: 0.434098 | kinetic: 0.259241
+Step 23201/100001 | loss: 32.037586 | data: 0.599445 | kinetic: 0.258169
+Step 23251/100001 | loss: 22.652710 | data: 0.406223 | kinetic: 0.292693
+Step 23301/100001 | loss: 15.862274 | data: 0.285821 | kinetic: 0.196401
+Step 23351/100001 | loss: 16.878714 | data: 0.290578 | kinetic: 0.293727
+Step 23401/100001 | loss: 17.053617 | data: 0.310163 | kinetic: 0.193182
+Step 23451/100001 | loss: 38.753868 | data: 0.729484 | kinetic: 0.284956
+Step 23501/100001 | loss: 11.153684 | data: 0.189532 | kinetic: 0.209635
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_23500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_23500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 23500: batch_ids=[0, 1], graph has 456 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 456
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1360 edges
+[EncoderGraphLogger] Saved graph sample 1: 229 nodes, 1732 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 434 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 239 nodes, 592 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_23500
+Step 23551/100001 | loss: 28.110163 | data: 0.522178 | kinetic: 0.250158
+Step 23601/100001 | loss: 24.859003 | data: 0.458995 | kinetic: 0.238656
+Step 23651/100001 | loss: 11.553975 | data: 0.200029 | kinetic: 0.194067
+Step 23701/100001 | loss: 28.510963 | data: 0.530780 | kinetic: 0.246495
+Step 23751/100001 | loss: 19.044336 | data: 0.344879 | kinetic: 0.225047
+Step 23801/100001 | loss: 41.803772 | data: 0.807616 | kinetic: 0.177871
+Step 23851/100001 | loss: 17.612610 | data: 0.309004 | kinetic: 0.270299
+Step 23901/100001 | loss: 31.639463 | data: 0.589520 | kinetic: 0.270433
+Step 23951/100001 | loss: 13.376759 | data: 0.241211 | kinetic: 0.164524
+Step 24001/100001 | loss: 23.408876 | data: 0.437322 | kinetic: 0.192846
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_24000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_24000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 24000: batch_ids=[0, 1], graph has 449 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 449
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1368 edges
+[EncoderGraphLogger] Saved graph sample 1: 223 nodes, 1662 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 427 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 233 nodes, 570 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_24000
+Step 24051/100001 | loss: 35.542809 | data: 0.675582 | kinetic: 0.220465
+Step 24101/100001 | loss: 13.502677 | data: 0.242276 | kinetic: 0.173609
+Step 24151/100001 | loss: 22.679392 | data: 0.402536 | kinetic: 0.319072
+Step 24201/100001 | loss: 20.556332 | data: 0.373778 | kinetic: 0.233431
+Step 24251/100001 | loss: 35.249241 | data: 0.675345 | kinetic: 0.185250
+Step 24301/100001 | loss: 11.117808 | data: 0.190238 | kinetic: 0.200739
+Step 24351/100001 | loss: 14.612823 | data: 0.247700 | kinetic: 0.278480
+Step 24401/100001 | loss: 20.738600 | data: 0.374884 | kinetic: 0.249299
+Step 24451/100001 | loss: 8.700464 | data: 0.148252 | kinetic: 0.160986
+Step 24501/100001 | loss: 20.941090 | data: 0.382474 | kinetic: 0.227175
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_24500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_24500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 24500: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 220 nodes, 1284 edges
+[EncoderGraphLogger] Saved graph sample 1: 235 nodes, 1852 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 230 nodes, 418 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 245 nodes, 604 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_24500
+Step 24551/100001 | loss: 28.583183 | data: 0.538880 | kinetic: 0.204895
+Step 24601/100001 | loss: 23.220053 | data: 0.424491 | kinetic: 0.249440
+Step 24651/100001 | loss: 26.281605 | data: 0.494905 | kinetic: 0.192046
+Step 24701/100001 | loss: 13.569324 | data: 0.231856 | kinetic: 0.247064
+Step 24751/100001 | loss: 28.641771 | data: 0.538234 | kinetic: 0.216261
+Step 24801/100001 | loss: 49.547203 | data: 0.962126 | kinetic: 0.180111
+Step 24851/100001 | loss: 17.881504 | data: 0.316803 | kinetic: 0.255168
+Step 24901/100001 | loss: 21.696775 | data: 0.392922 | kinetic: 0.256333
+Step 24951/100001 | loss: 15.879319 | data: 0.291245 | kinetic: 0.164634
+Step 25001/100001 | loss: 22.882889 | data: 0.417416 | kinetic: 0.251509
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_25000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_25000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 25000: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 232 nodes, 1394 edges
+[EncoderGraphLogger] Saved graph sample 1: 223 nodes, 1674 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 242 nodes, 439 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 233 nodes, 579 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_25000
+Step 25051/100001 | loss: 40.337032 | data: 0.772756 | kinetic: 0.212401
+Step 25101/100001 | loss: 29.634874 | data: 0.557842 | kinetic: 0.217847
+Step 25151/100001 | loss: 9.418835 | data: 0.162175 | kinetic: 0.163759
+Step 25201/100001 | loss: 29.908331 | data: 0.556583 | kinetic: 0.259898
+Step 25251/100001 | loss: 44.488110 | data: 0.859671 | kinetic: 0.188071
+Step 25301/100001 | loss: 28.682604 | data: 0.542364 | kinetic: 0.195552
+Step 25351/100001 | loss: 35.653015 | data: 0.681303 | kinetic: 0.198485
+Step 25401/100001 | loss: 48.348190 | data: 0.934363 | kinetic: 0.203757
+Step 25451/100001 | loss: 35.715084 | data: 0.672610 | kinetic: 0.260571
+Step 25501/100001 | loss: 38.451691 | data: 0.739117 | kinetic: 0.186981
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_25500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_25500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 25500: batch_ids=[0, 1], graph has 466 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 466
+[EncoderGraphLogger] Saved graph sample 0: 240 nodes, 1524 edges
+[EncoderGraphLogger] Saved graph sample 1: 226 nodes, 1748 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 250 nodes, 454 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 236 nodes, 582 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_25500
+Step 25551/100001 | loss: 23.284094 | data: 0.433117 | kinetic: 0.203528
+Step 25601/100001 | loss: 16.518270 | data: 0.298164 | kinetic: 0.201260
+Step 25651/100001 | loss: 24.447306 | data: 0.452567 | kinetic: 0.227370
+Step 25701/100001 | loss: 14.616907 | data: 0.253899 | kinetic: 0.240246
+Step 25751/100001 | loss: 13.735762 | data: 0.247000 | kinetic: 0.173223
+Step 25801/100001 | loss: 30.530634 | data: 0.566823 | kinetic: 0.273686
+Step 25851/100001 | loss: 8.116152 | data: 0.133908 | kinetic: 0.177595
+Step 25901/100001 | loss: 22.676704 | data: 0.422299 | kinetic: 0.195217
+Step 25951/100001 | loss: 30.657265 | data: 0.571673 | kinetic: 0.259202
+Step 26001/100001 | loss: 39.600723 | data: 0.755133 | kinetic: 0.230511
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_26000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_26000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 26000: batch_ids=[0, 1], graph has 445 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 445
+[EncoderGraphLogger] Saved graph sample 0: 221 nodes, 1316 edges
+[EncoderGraphLogger] Saved graph sample 1: 224 nodes, 1730 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 231 nodes, 420 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 234 nodes, 580 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_26000
+Step 26051/100001 | loss: 27.906864 | data: 0.514443 | kinetic: 0.273090
+Step 26101/100001 | loss: 16.359171 | data: 0.278244 | kinetic: 0.305874
+Step 26151/100001 | loss: 36.200378 | data: 0.688914 | kinetic: 0.219332
+Step 26201/100001 | loss: 22.408201 | data: 0.406698 | kinetic: 0.259163
+Step 26251/100001 | loss: 34.453522 | data: 0.651223 | kinetic: 0.236546
+Step 26301/100001 | loss: 26.730881 | data: 0.494049 | kinetic: 0.253551
+Step 26351/100001 | loss: 12.040667 | data: 0.201964 | kinetic: 0.242811
+Step 26401/100001 | loss: 9.526098 | data: 0.151989 | kinetic: 0.240830
+Step 26451/100001 | loss: 25.616894 | data: 0.474178 | kinetic: 0.238502
+Step 26501/100001 | loss: 18.183544 | data: 0.326012 | kinetic: 0.235365
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_26500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_26500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 26500: batch_ids=[0, 1], graph has 449 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 449
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1342 edges
+[EncoderGraphLogger] Saved graph sample 1: 224 nodes, 1764 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 429 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 234 nodes, 578 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_26500
+Step 26551/100001 | loss: 30.291912 | data: 0.562193 | kinetic: 0.272783
+Step 26601/100001 | loss: 17.481377 | data: 0.310982 | kinetic: 0.241532
+Step 26651/100001 | loss: 23.706709 | data: 0.424140 | kinetic: 0.312466
+Step 26701/100001 | loss: 23.218575 | data: 0.425147 | kinetic: 0.245151
+Step 26751/100001 | loss: 33.407024 | data: 0.634780 | kinetic: 0.208503
+Step 26801/100001 | loss: 15.204183 | data: 0.262046 | kinetic: 0.262734
+Step 26851/100001 | loss: 34.127003 | data: 0.641806 | kinetic: 0.254588
+Step 26901/100001 | loss: 15.417506 | data: 0.273689 | kinetic: 0.216630
+Step 26951/100001 | loss: 34.165131 | data: 0.652528 | kinetic: 0.192339
+Step 27001/100001 | loss: 29.375374 | data: 0.550512 | kinetic: 0.231220
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_27000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_27000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 27000: batch_ids=[0, 1], graph has 456 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 456
+[EncoderGraphLogger] Saved graph sample 0: 224 nodes, 1342 edges
+[EncoderGraphLogger] Saved graph sample 1: 232 nodes, 1846 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 234 nodes, 425 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 242 nodes, 595 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_27000
+Step 27051/100001 | loss: 28.250753 | data: 0.507807 | kinetic: 0.357549
+Step 27101/100001 | loss: 23.108665 | data: 0.427637 | kinetic: 0.215849
+Step 27151/100001 | loss: 15.529528 | data: 0.276500 | kinetic: 0.213065
+Step 27201/100001 | loss: 30.796364 | data: 0.582830 | kinetic: 0.206857
+Step 27251/100001 | loss: 20.026310 | data: 0.369262 | kinetic: 0.195404
+Step 27301/100001 | loss: 34.814972 | data: 0.659741 | kinetic: 0.228491
+Step 27351/100001 | loss: 41.991753 | data: 0.800703 | kinetic: 0.244577
+Step 27401/100001 | loss: 30.085659 | data: 0.554731 | kinetic: 0.293638
+Step 27451/100001 | loss: 65.620155 | data: 1.283810 | kinetic: 0.178709
+Step 27501/100001 | loss: 26.311506 | data: 0.493487 | kinetic: 0.204642
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_27500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_27500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 27500: batch_ids=[0, 1], graph has 458 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 458
+[EncoderGraphLogger] Saved graph sample 0: 225 nodes, 1300 edges
+[EncoderGraphLogger] Saved graph sample 1: 233 nodes, 1852 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 235 nodes, 428 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 243 nodes, 598 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_27500
+Step 27551/100001 | loss: 14.794562 | data: 0.268949 | kinetic: 0.168388
+Step 27601/100001 | loss: 22.611172 | data: 0.417124 | kinetic: 0.219374
+Step 27651/100001 | loss: 27.915606 | data: 0.517217 | kinetic: 0.256846
+Step 27701/100001 | loss: 37.575989 | data: 0.707974 | kinetic: 0.272162
+Step 27751/100001 | loss: 16.014326 | data: 0.285111 | kinetic: 0.219846
+Step 27801/100001 | loss: 20.557470 | data: 0.379604 | kinetic: 0.197157
+Step 27851/100001 | loss: 17.268988 | data: 0.310404 | kinetic: 0.218598
+Step 27901/100001 | loss: 11.301422 | data: 0.185190 | kinetic: 0.255243
+Step 27951/100001 | loss: 27.299540 | data: 0.506340 | kinetic: 0.247815
+Step 28001/100001 | loss: 15.786321 | data: 0.281581 | kinetic: 0.213408
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_28000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_28000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 28000: batch_ids=[0, 1], graph has 447 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 447
+[EncoderGraphLogger] Saved graph sample 0: 219 nodes, 1266 edges
+[EncoderGraphLogger] Saved graph sample 1: 228 nodes, 1790 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 229 nodes, 418 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 238 nodes, 580 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_28000
+Step 28051/100001 | loss: 41.574131 | data: 0.796500 | kinetic: 0.218640
+Step 28101/100001 | loss: 11.410714 | data: 0.193615 | kinetic: 0.216245
+Step 28151/100001 | loss: 23.476582 | data: 0.431666 | kinetic: 0.236659
+Step 28201/100001 | loss: 22.330585 | data: 0.403549 | kinetic: 0.269141
+Step 28251/100001 | loss: 13.466550 | data: 0.228822 | kinetic: 0.253179
+Step 28301/100001 | loss: 60.988380 | data: 1.184435 | kinetic: 0.220831
+Step 28351/100001 | loss: 32.267338 | data: 0.606724 | kinetic: 0.241390
+Step 28401/100001 | loss: 27.798195 | data: 0.504802 | kinetic: 0.319761
+Step 28451/100001 | loss: 45.207493 | data: 0.866315 | kinetic: 0.236468
+Step 28501/100001 | loss: 15.742561 | data: 0.273958 | kinetic: 0.255581
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_28500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_28500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 28500: batch_ids=[0, 1], graph has 455 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 455
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1420 edges
+[EncoderGraphLogger] Saved graph sample 1: 227 nodes, 1722 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 436 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 237 nodes, 585 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_28500
+Step 28551/100001 | loss: 28.609016 | data: 0.533094 | kinetic: 0.244291
+Step 28601/100001 | loss: 31.223753 | data: 0.574667 | kinetic: 0.311303
+Step 28651/100001 | loss: 28.125013 | data: 0.515716 | kinetic: 0.292403
+Step 28701/100001 | loss: 10.978127 | data: 0.176425 | kinetic: 0.269609
+Step 28751/100001 | loss: 16.002131 | data: 0.276348 | kinetic: 0.273092
+Step 28801/100001 | loss: 14.351256 | data: 0.249562 | kinetic: 0.234146
+Step 28851/100001 | loss: 66.396210 | data: 1.292581 | kinetic: 0.220892
+Step 28901/100001 | loss: 36.437660 | data: 0.696377 | kinetic: 0.202350
+Step 28951/100001 | loss: 28.731462 | data: 0.532452 | kinetic: 0.263610
+Step 29001/100001 | loss: 14.862332 | data: 0.261430 | kinetic: 0.223856
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_29000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_29000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 29000: batch_ids=[0, 1], graph has 453 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 453
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1364 edges
+[EncoderGraphLogger] Saved graph sample 1: 225 nodes, 1694 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 432 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 235 nodes, 579 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_29000
+Step 29051/100001 | loss: 20.614439 | data: 0.383427 | kinetic: 0.180386
+Step 29101/100001 | loss: 33.505898 | data: 0.629819 | kinetic: 0.251871
+Step 29151/100001 | loss: 16.457188 | data: 0.286954 | kinetic: 0.263684
+Step 29201/100001 | loss: 19.823132 | data: 0.360172 | kinetic: 0.226816
+Step 29251/100001 | loss: 20.360640 | data: 0.373005 | kinetic: 0.213798
+Step 29301/100001 | loss: 13.171493 | data: 0.227161 | kinetic: 0.226678
+Step 29351/100001 | loss: 37.637924 | data: 0.711578 | kinetic: 0.257380
+Step 29401/100001 | loss: 9.672987 | data: 0.161868 | kinetic: 0.197451
+Step 29451/100001 | loss: 37.558796 | data: 0.714745 | kinetic: 0.227694
+Step 29501/100001 | loss: 16.661551 | data: 0.283302 | kinetic: 0.312058
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_29500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_29500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 29500: batch_ids=[0, 1], graph has 457 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 457
+[EncoderGraphLogger] Saved graph sample 0: 231 nodes, 1414 edges
+[EncoderGraphLogger] Saved graph sample 1: 226 nodes, 1682 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 241 nodes, 443 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 236 nodes, 576 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_29500
+Step 29551/100001 | loss: 22.681601 | data: 0.418246 | kinetic: 0.221165
+Step 29601/100001 | loss: 14.156094 | data: 0.245221 | kinetic: 0.236879
+Step 29651/100001 | loss: 24.699068 | data: 0.455453 | kinetic: 0.240803
+Step 29701/100001 | loss: 33.077713 | data: 0.624386 | kinetic: 0.232301
+Step 29751/100001 | loss: 26.704031 | data: 0.498521 | kinetic: 0.222248
+Step 29801/100001 | loss: 20.594492 | data: 0.379848 | kinetic: 0.200262
+Step 29851/100001 | loss: 21.079807 | data: 0.386797 | kinetic: 0.217497
+Step 29901/100001 | loss: 44.893677 | data: 0.855558 | kinetic: 0.264471
+Step 29951/100001 | loss: 14.161817 | data: 0.246250 | kinetic: 0.231163
+Step 30001/100001 | loss: 46.358326 | data: 0.897194 | kinetic: 0.187326
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_30000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_30000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 30000: batch_ids=[0, 1], graph has 461 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 461
+[EncoderGraphLogger] Saved graph sample 0: 228 nodes, 1406 edges
+[EncoderGraphLogger] Saved graph sample 1: 233 nodes, 1818 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 238 nodes, 435 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 243 nodes, 598 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_30000
+Step 30051/100001 | loss: 24.254667 | data: 0.452782 | kinetic: 0.201948
+Step 30101/100001 | loss: 39.568993 | data: 0.758250 | kinetic: 0.207059
+Step 30151/100001 | loss: 15.226289 | data: 0.266818 | kinetic: 0.235676
+Step 30201/100001 | loss: 26.922649 | data: 0.506867 | kinetic: 0.197412
+Step 30251/100001 | loss: 32.632042 | data: 0.612117 | kinetic: 0.253276
+Step 30301/100001 | loss: 13.101789 | data: 0.217995 | kinetic: 0.275257
+Step 30351/100001 | loss: 31.170355 | data: 0.590197 | kinetic: 0.207564
+Step 30401/100001 | loss: 25.217072 | data: 0.468328 | kinetic: 0.225084
+Step 30451/100001 | loss: 21.480587 | data: 0.399434 | kinetic: 0.188611
+Step 30501/100001 | loss: 50.832668 | data: 0.990305 | kinetic: 0.164675
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_30500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_30500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 30500: batch_ids=[0, 1], graph has 449 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 449
+[EncoderGraphLogger] Saved graph sample 0: 226 nodes, 1400 edges
+[EncoderGraphLogger] Saved graph sample 1: 223 nodes, 1676 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 236 nodes, 430 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 233 nodes, 569 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_30500
+Step 30551/100001 | loss: 25.373455 | data: 0.473370 | kinetic: 0.213118
+Step 30601/100001 | loss: 33.668888 | data: 0.638143 | kinetic: 0.220215
+Step 30651/100001 | loss: 31.419724 | data: 0.596744 | kinetic: 0.197818
+Step 30701/100001 | loss: 26.048433 | data: 0.495388 | kinetic: 0.159878
+Step 30751/100001 | loss: 14.235422 | data: 0.247223 | kinetic: 0.234282
+Step 30801/100001 | loss: 20.138550 | data: 0.361399 | kinetic: 0.258575
+Step 30851/100001 | loss: 9.363496 | data: 0.157511 | kinetic: 0.185993
+Step 30901/100001 | loss: 18.102598 | data: 0.327713 | kinetic: 0.214617
+Step 30951/100001 | loss: 11.547403 | data: 0.199284 | kinetic: 0.197901
+Step 31001/100001 | loss: 31.218987 | data: 0.592067 | kinetic: 0.201955
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_31000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_31000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 31000: batch_ids=[0, 1], graph has 454 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 454
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1378 edges
+[EncoderGraphLogger] Saved graph sample 1: 225 nodes, 1748 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 431 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 235 nodes, 587 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_31000
+Step 31051/100001 | loss: 28.054111 | data: 0.531300 | kinetic: 0.186137
+Step 31101/100001 | loss: 23.694714 | data: 0.443644 | kinetic: 0.189066
+Step 31151/100001 | loss: 34.739872 | data: 0.659167 | kinetic: 0.222692
+Step 31201/100001 | loss: 39.708771 | data: 0.755650 | kinetic: 0.240782
+Step 31251/100001 | loss: 19.888060 | data: 0.361790 | kinetic: 0.224821
+Step 31301/100001 | loss: 34.142578 | data: 0.642305 | kinetic: 0.253413
+Step 31351/100001 | loss: 44.403873 | data: 0.859675 | kinetic: 0.177514
+Step 31401/100001 | loss: 17.652786 | data: 0.321635 | kinetic: 0.196381
+Step 31451/100001 | loss: 24.086962 | data: 0.436710 | kinetic: 0.281433
+Step 31501/100001 | loss: 14.981865 | data: 0.262650 | kinetic: 0.231172
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_31500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_31500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 31500: batch_ids=[0, 1], graph has 438 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 438
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1354 edges
+[EncoderGraphLogger] Saved graph sample 1: 211 nodes, 1442 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 430 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 221 nodes, 541 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_31500
+Step 31551/100001 | loss: 20.478193 | data: 0.371247 | kinetic: 0.239481
+Step 31601/100001 | loss: 20.371136 | data: 0.363117 | kinetic: 0.276912
+Step 31651/100001 | loss: 49.163799 | data: 0.952967 | kinetic: 0.189430
+Step 31701/100001 | loss: 32.615971 | data: 0.612638 | kinetic: 0.248010
+Step 31751/100001 | loss: 33.925262 | data: 0.646517 | kinetic: 0.199926
+Step 31801/100001 | loss: 44.385853 | data: 0.851468 | kinetic: 0.226559
+Step 31851/100001 | loss: 27.154253 | data: 0.500247 | kinetic: 0.267736
+Step 31901/100001 | loss: 35.820015 | data: 0.684803 | kinetic: 0.197482
+Step 31951/100001 | loss: 26.182964 | data: 0.487727 | kinetic: 0.224576
+Step 32001/100001 | loss: 31.460609 | data: 0.585931 | kinetic: 0.270507
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_32000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_32000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 32000: batch_ids=[0, 1], graph has 467 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 467
+[EncoderGraphLogger] Saved graph sample 0: 229 nodes, 1374 edges
+[EncoderGraphLogger] Saved graph sample 1: 238 nodes, 1888 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 239 nodes, 433 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 248 nodes, 614 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_32000
+Step 32051/100001 | loss: 24.723225 | data: 0.455884 | kinetic: 0.241127
+Step 32101/100001 | loss: 16.942677 | data: 0.296644 | kinetic: 0.263807
+Step 32151/100001 | loss: 17.830666 | data: 0.318874 | kinetic: 0.235870
+Step 32201/100001 | loss: 16.401083 | data: 0.294094 | kinetic: 0.212047
+Step 32251/100001 | loss: 25.205275 | data: 0.469625 | kinetic: 0.215504
+Step 32301/100001 | loss: 13.703141 | data: 0.232466 | kinetic: 0.259982
+Step 32351/100001 | loss: 36.591038 | data: 0.691312 | kinetic: 0.253183
+Step 32401/100001 | loss: 10.770746 | data: 0.176457 | kinetic: 0.243484
+Step 32451/100001 | loss: 23.709936 | data: 0.436522 | kinetic: 0.235480
+Step 32501/100001 | loss: 46.456547 | data: 0.893676 | kinetic: 0.221592
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_32500/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_32500/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 32500: batch_ids=[0, 1], graph has 451 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 451
+[EncoderGraphLogger] Saved graph sample 0: 224 nodes, 1306 edges
+[EncoderGraphLogger] Saved graph sample 1: 227 nodes, 1736 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 234 nodes, 419 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 237 nodes, 586 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_32500
+Step 32551/100001 | loss: 25.755409 | data: 0.473457 | kinetic: 0.260317
+Step 32601/100001 | loss: 45.560860 | data: 0.863720 | kinetic: 0.296860
+Step 32651/100001 | loss: 19.113531 | data: 0.344349 | kinetic: 0.237012
+Step 32701/100001 | loss: 36.851929 | data: 0.695524 | kinetic: 0.259469
+Step 32751/100001 | loss: 17.858425 | data: 0.313009 | kinetic: 0.275995
+Step 32801/100001 | loss: 32.174225 | data: 0.606655 | kinetic: 0.230188
+Step 32851/100001 | loss: 42.448402 | data: 0.808688 | kinetic: 0.251749
+Step 32901/100001 | loss: 12.349456 | data: 0.210617 | kinetic: 0.227323
+Step 32951/100001 | loss: 29.906816 | data: 0.555197 | kinetic: 0.268368
+Step 33001/100001 | loss: 13.986939 | data: 0.233365 | kinetic: 0.289839
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 0) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_33000/forward/shape_0
+[io.export_reference_shapes] Exported source (252 points) and target (252 points)
+[TrajectoryExporter] Exporting forward trajectory (shape 1) to outputs/rabbit_encoder_cohort_so3_test/trajectories/step_33000/forward/shape_1
+[TrajectoryExporter] Successfully exported 2 forward trajectories
+[EncoderGraphLogger] Step 33000: batch_ids=[0, 1], graph has 462 nodes
+[EncoderGraphLogger] Graph batch ids: [0, 1], total nodes: 462
+[EncoderGraphLogger] Saved graph sample 0: 227 nodes, 1364 edges
+[EncoderGraphLogger] Saved graph sample 1: 235 nodes, 1856 edges
+[EncoderGraphLogger] Supergraph batch ids: [0, 1], total nodes: 20
+[EncoderGraphLogger] Saved supergraph sample 0: 237 nodes, 434 edges
+[EncoderGraphLogger] Saved supergraph sample 1: 245 nodes, 602 edges
+[EncoderGraphLogger] Batch types: template=CohortBatch, sample=CohortBatch
+[EncoderGraphLogger] Batch shapes: template.points=torch.Size([1, 252, 3]), sample.points=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Exported template_points: 252 points
+[EncoderGraphLogger] Found augmented_sample_batch: shape=torch.Size([2, 252, 3])
+[EncoderGraphLogger] Batch has 2 samples, augmented_sample_batch: True, augmented_sample: False
+[EncoderGraphLogger] Exported sample_points_0: 252 points
+[EncoderGraphLogger] Exported sample_points_1: 252 points
+[EncoderGraphLogger] Exported encoder graph to outputs/rabbit_encoder_cohort_so3_test/encoder_graphs/step_33000
+Step 33051/100001 | loss: 36.634327 | data: 0.687099 | kinetic: 0.284924
+Step 33101/100001 | loss: 18.813278 | data: 0.339062 | kinetic: 0.232520
+Step 33151/100001 | loss: 8.798350 | data: 0.141745 | kinetic: 0.213887
+Step 33201/100001 | loss: 21.557667 | data: 0.393929 | kinetic: 0.232651
+Step 33251/100001 | loss: 40.002487 | data: 0.752526 | kinetic: 0.297023
+Step 33301/100001 | loss: 20.330717 | data: 0.374372 | kinetic: 0.201515
