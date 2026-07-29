@@ -18,7 +18,7 @@ from src.resnet_lddmm.config import ExperimentCfg
 from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
 from src.resnet_lddmm.registration.cohort import CohortRegistration
-from src.resnet_lddmm.flow import NeuralODEFlow
+from src.resnet_lddmm.flow import NeuralODEFlow, IdentityFlowWrapper
 from src.resnet_lddmm.integrators import ForwardEuler, ModifiedEuler
 from src.resnet_lddmm.losses import UnidirectionalMappingError, BidirectionalMappingError
 from src.resnet_lddmm import registrations  #  Side effect: registers all component Load component registrations
@@ -27,7 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger
 
 
 def _encoder_layers_to_list_of_dicts(encoder_config):
@@ -99,8 +99,14 @@ def _build_encoder_code_source(encoder_config, graph_spec, n_z):
 class VerboseCallback(Callback):
     """Log loss progression during training."""
 
-    def __init__(self, log_every=1):
+    def __init__(self, log_every=1, pose_only_mode=False):
         super().__init__(every_n_steps=log_every)
+        self.pose_only_mode = pose_only_mode
+
+    def on_train_start(self, ctx):
+        """Print training mode info at startup."""
+        if self.pose_only_mode:
+            print("[POSE-ONLY MODE] Flow is frozen at identity; encoder learns pose only.")
 
     def on_step_end(self, ctx, step, metrics, batch, pred):
         """Print loss at cadence."""
@@ -146,8 +152,24 @@ def build(cfg: ExperimentCfg):
     seed_everything(cfg.train.seed)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
-    # Validate encoder_pose configuration: only unidirectional flow supported
+    # Validate encoder_pose configuration
     use_encoder_pose = getattr(cfg, 'use_encoder_pose', False)
+    freeze_flow_at_identity = getattr(cfg, 'freeze_flow_at_identity', False)
+
+    # Validate freeze_flow_at_identity first (most specific)
+    if freeze_flow_at_identity and not use_encoder_pose:
+        raise ValueError(
+            "freeze_flow_at_identity requires use_encoder_pose=true. "
+            "Pose-only training only makes sense if encoder learns pose."
+        )
+
+    if freeze_flow_at_identity and cfg.loss.direction == "bidirectional":
+        raise ValueError(
+            "freeze_flow_at_identity requires unidirectional flow. "
+            "Set loss.direction='forward' or disable freeze_flow_at_identity."
+        )
+
+    # Then validate use_encoder_pose
     if use_encoder_pose and cfg.loss.direction == "bidirectional":
         raise ValueError(
             "use_encoder_pose currently supports unidirectional flow only. "
@@ -199,6 +221,10 @@ def build(cfg: ExperimentCfg):
         inverse=integrator_inverse,
         num_steps=cfg.field.num_steps
     )
+
+    # Conditionally wrap flow at identity for pose-only training
+    if freeze_flow_at_identity:
+        flow = IdentityFlowWrapper(flow)
 
     # Registry.create: data term and isometry loss (shared)
     data_term = Registry.create(
@@ -418,6 +444,7 @@ def run(cfg: ExperimentCfg, callbacks=None):
         save_every = getattr(cfg.train, 'save_every', 100)
         export_shapes = getattr(cfg.train, 'export_shapes', 0)
         export_strategy = getattr(cfg.train, 'export_strategy', 'sequential')
+        freeze_flow_at_identity = getattr(cfg, 'freeze_flow_at_identity', False)
         # Seed rng for export strategy if seed is set
         export_rng = None
         if cfg.train.seed is not None:
@@ -425,7 +452,7 @@ def run(cfg: ExperimentCfg, callbacks=None):
             export_rng.manual_seed(cfg.train.seed)
         callbacks = [
             NetworkStructureInspector(),
-            VerboseCallback(log_every=log_every),
+            VerboseCallback(log_every=log_every, pose_only_mode=freeze_flow_at_identity),
             GradientLogger(every_n_steps=log_every),
             RequiresGradMonitor(every_n_steps=log_every),
             TrajectoryExporter(every_n_steps=save_every, export_shapes=export_shapes,
@@ -444,6 +471,11 @@ def run(cfg: ExperimentCfg, callbacks=None):
     if cfg.code.kind == "encoder":
         graph_log_cadence = getattr(cfg.train, 'save_every', 100)
         callbacks.append(EncoderGraphLogger(every_n_steps=graph_log_cadence))
+
+    # Add PoseLogger if using encoder pose
+    if getattr(cfg, 'use_encoder_pose', False):
+        pose_log_cadence = getattr(cfg.train, 'log_every', 50)
+        callbacks.append(PoseLogger(every_n_steps=pose_log_cadence))
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,

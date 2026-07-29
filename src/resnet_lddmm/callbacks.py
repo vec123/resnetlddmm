@@ -1,6 +1,7 @@
 """Diagnostics and export callbacks for ResNetLDDMM (STEP T20)."""
 
 import os
+import json
 import torch
 import numpy as np
 
@@ -872,3 +873,139 @@ class RequiresGradMonitor(Callback):
                 for p in flow_params:
                     f.write(f"  {p['name']:<50} requires_grad={p['requires_grad']:<5} shape={p['shape']}\n")
                 f.write("\n")
+
+
+class PoseLogger(Callback):
+    """Log encoder-predicted poses (rotation + translation) to JSON.
+
+    Records the estimated rotation matrix and translation vector from the
+    encoder at specified cadence. Useful for monitoring pose learning in
+    encoder-based registration with use_encoder_pose=true.
+
+    Output format:
+    {
+        "step": int,
+        "rotation": [[3x3 matrix as list of lists]],
+        "translation": [3D vector as list],
+        "rotation_det": float (should be ~1 for proper rotation),
+        "rotation_eigenvalues": list (should be [1, 1, 1] for SO(3))
+    }
+    """
+
+    def __init__(self, every_n_steps=50):
+        super().__init__(every_n_steps)
+        self.log_dir = None
+
+    def on_train_start(self, ctx):
+        """Create pose_logs directory at start of training."""
+        self.log_dir = os.path.join(ctx.log_dir, "pose_logs")
+        os.makedirs(self.log_dir, exist_ok=True)
+        print(f"[PoseLogger] Logging poses to {self.log_dir}")
+
+    def on_step_end(self, ctx, step, metrics, batch, pred):
+        """Log pose if due."""
+        if not self._due(step) or self.log_dir is None:
+            return
+
+        stepper = ctx.stepper
+        code_source = stepper.code_source if hasattr(stepper, 'code_source') else None
+
+        # Check if encoder has pose
+        if code_source is None or not hasattr(code_source, 'get_pose'):
+            return
+
+        rotation, translation = code_source.get_pose()
+
+        # Skip if pose is None
+        if rotation is None and translation is None:
+            return
+
+        try:
+            pose_data = {
+                'step': step,
+                'rotation': None,
+                'translation': None,
+                'rotation_det': None,
+                'rotation_frobenius_norm': None,
+            }
+
+            # Log rotation matrix if present
+            if rotation is not None:
+                R = rotation.detach().cpu().numpy()
+                # Handle batch dimension: if [B, 3, 3], take first sample [0, :, :]
+                if R.ndim == 3:
+                    R = R[0]  # Take first batch element
+
+                pose_data['rotation'] = R.tolist()
+                det = np.linalg.det(R)
+                pose_data['rotation_det'] = float(det) if np.isscalar(det) else float(det.item())
+
+                # Frobenius norm of (R^T R - I) to check orthonormality
+                orthogonality_error = np.linalg.norm(R.T @ R - np.eye(3))
+                pose_data['orthogonality_error'] = float(orthogonality_error)
+
+            # Log translation vector if present
+            if translation is not None:
+                t = translation.detach().cpu().numpy()
+                # Handle batch dimension: if [B, 3], take first sample [0, :]
+                if t.ndim == 2:
+                    t = t[0]
+                pose_data['translation'] = t.tolist()
+
+            # Save to JSON
+            pose_path = os.path.join(self.log_dir, f"step_{step:06d}.json")
+            with open(pose_path, 'w') as f:
+                json.dump(pose_data, f, indent=2)
+
+            # Append to history CSV
+            self._append_pose_history(step, pose_data)
+
+        except Exception as e:
+            print(f"[PoseLogger] Failed to log pose at step {step}: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _append_pose_history(self, step, pose_data):
+        """Append pose data to CSV history for easy plotting."""
+        import csv
+
+        csv_path = os.path.join(self.log_dir, "pose_history.csv")
+        file_exists = os.path.exists(csv_path)
+
+        # Flatten rotation matrix into 9 separate columns
+        fieldnames = ['step', 'translation_x', 'translation_y', 'translation_z',
+                      'rotation_det', 'orthogonality_error']
+        for i in range(3):
+            for j in range(3):
+                fieldnames.append(f'rotation_{i}{j}')
+
+        with open(csv_path, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            if not file_exists:
+                writer.writeheader()
+
+            # Build row
+            row = {
+                'step': step,
+                'translation_x': None,
+                'translation_y': None,
+                'translation_z': None,
+                'rotation_det': pose_data['rotation_det'],
+                'orthogonality_error': pose_data['orthogonality_error'],
+            }
+
+            # Add translation entries
+            if pose_data['translation'] and len(pose_data['translation']) >= 3:
+                row['translation_x'] = pose_data['translation'][0]
+                row['translation_y'] = pose_data['translation'][1]
+                row['translation_z'] = pose_data['translation'][2]
+
+            # Add rotation matrix entries
+            if pose_data['rotation']:
+                R = pose_data['rotation']
+                for i in range(3):
+                    for j in range(3):
+                        row[f'rotation_{i}{j}'] = R[i][j]
+
+            writer.writerow(row)

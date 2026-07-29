@@ -1,0 +1,103 @@
+# Pose-Only Training Example
+#
+# This config trains the encoder to learn a pose (rotation + translation) that
+# maximizes alignment between template and augmented input, while keeping the
+# LDDMM flow frozen at identity.
+#
+# Key flags:
+#   use_encoder_pose: true          (required)
+#   freeze_flow_at_identity: true   (enables pose-only mode)
+#
+# Expected behavior:
+#   - Template points are unchanged by flow (identity transformation)
+#   - Encoder learns rotation + translation to align template with sample
+#   - Loss is purely Chamfer distance (kinetic energy = 0)
+#   - No deformation of template, only rigid pose
+#
+
+source: data/rabbit/single_pair  # Template
+target: data/rabbit/T90.obj       # Sample
+output_dir: outputs/pose_only_test
+
+field:
+  kind: stationary
+  num_steps: 1                    # Only identity needed (no deformation)
+  width: 64                       # Can be small since no learned transformation
+  activation: relu
+  fa: [32, 32]
+  df: [64, 64]
+  fourier_n_e: 3
+
+code:
+  kind: encoder
+  conditioning_method: concat
+  n_z: 10
+
+  # Encoder configuration for pose learning
+  encoder_config:
+    latent_dim: 10
+    readout: mean
+    readout_heads: 1
+    supernode_sh_lmax: 3
+    transformer_type: equiformer
+    transformer_cfg:
+      num_layers: 2
+      num_heads: 2
+      num_channels: 8
+      lmax: 2
+    area_pool: true
+    latent_mode: deterministic
+    verbose: false
+
+    # Equivariant layer stack
+    layers:
+      - in_irreps: "1x0e"
+        target_irreps: "16x0e + 8x1o"
+        spatial_sh_lmax: 2
+        interaction_sh_lmax: 3
+
+  # Graph construction
+  graph_spec:
+    r_max: 0.1
+    r_supergraph: 0.3
+    dropout_rate: 0.1
+    use_supernodes: true
+    n_supernodes: 10
+    sampling_mode_supernodes: fps
+    sampling_mode_graph: uniform
+    recompute_area: true
+    area_k: 8
+    noise_std: 0.0
+
+augmentation:
+  kind: so3
+  seed: 42
+
+# === KEY SETTINGS FOR POSE-ONLY MODE ===
+use_encoder_pose: true               # REQUIRED: encoder predicts pose
+freeze_flow_at_identity: true        # ENABLES POSE-ONLY MODE
+
+loss:
+  data_name: chamfer
+  data_kwargs: {}
+  direction: forward                 # REQUIRED: must be unidirectional
+  sigma: 0.01
+  kinetic_weight: 0.01               # Will be 0 due to identity flow (no cost)
+  code_reg_weight: 0.0
+  weight_decay: 0.0001
+  isometry_weight: 0.0               # Disabled (no deformation to regularize)
+  isometry_type: strain
+  isometry_samples: 64
+  subsample_M: 2000                  # Subsample for efficient Chamfer
+
+train:
+  mode: pair
+  steps: 1000                        # Short run for testing
+  batch: 1
+  lr: 0.0001
+  seed: 42
+  log_every: 50
+  save_every: 100
+  val_every: 0
+  export_shapes: 1
+  export_strategy: sequential
