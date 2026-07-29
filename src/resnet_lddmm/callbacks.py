@@ -882,19 +882,24 @@ class PoseLogger(Callback):
     encoder at specified cadence. Useful for monitoring pose learning in
     encoder-based registration with use_encoder_pose=true.
 
+    For SO(3) augmentation, translation is not logged since target has zero
+    translation. For SE(3) augmentation, both rotation and translation logged.
+
     Output format:
     {
         "step": int,
+        "augmentation": "so3" or "se3",
         "rotation": [[3x3 matrix as list of lists]],
-        "translation": [3D vector as list],
+        "translation": [3D vector as list] (only for SE(3)),
         "rotation_det": float (should be ~1 for proper rotation),
-        "rotation_eigenvalues": list (should be [1, 1, 1] for SO(3))
+        "orthogonality_error": float (should be ~0)
     }
     """
 
-    def __init__(self, every_n_steps=50):
+    def __init__(self, every_n_steps=50, augmentation_kind="se3"):
         super().__init__(every_n_steps)
         self.log_dir = None
+        self.augmentation_kind = augmentation_kind  # "so3" or "se3"
 
     def on_train_start(self, ctx):
         """Create pose_logs directory at start of training."""
@@ -923,10 +928,15 @@ class PoseLogger(Callback):
         try:
             pose_data = {
                 'step': step,
+                'augmentation': self.augmentation_kind,
                 'rotation': None,
                 'translation': None,
                 'rotation_det': None,
                 'rotation_frobenius_norm': None,
+                'v1': None,
+                'v2': None,
+                'v1_norm': None,
+                'v2_norm': None,
             }
 
             # Log rotation matrix if present
@@ -944,13 +954,29 @@ class PoseLogger(Callback):
                 orthogonality_error = np.linalg.norm(R.T @ R - np.eye(3))
                 pose_data['orthogonality_error'] = float(orthogonality_error)
 
-            # Log translation vector if present
-            if translation is not None:
+            # Log translation vector ONLY for SE(3) augmentation (SO(3) has zero translation)
+            if translation is not None and self.augmentation_kind == "se3":
                 t = translation.detach().cpu().numpy()
                 # Handle batch dimension: if [B, 3], take first sample [0, :]
                 if t.ndim == 2:
                     t = t[0]
                 pose_data['translation'] = t.tolist()
+
+            # Log the raw pose vectors (v1, v2) that build the rotation
+            if code_source is not None and hasattr(code_source, '_last') and code_source._last is not None:
+                enc_output = code_source._last
+                if hasattr(enc_output, 'aux') and enc_output.aux and 'v1' in enc_output.aux:
+                    v1 = enc_output.aux['v1'].detach().cpu().numpy()
+                    v2 = enc_output.aux['v2'].detach().cpu().numpy()
+                    # Handle batch dimension
+                    if v1.ndim == 2:
+                        v1 = v1[0]
+                    if v2.ndim == 2:
+                        v2 = v2[0]
+                    pose_data['v1'] = v1.tolist()
+                    pose_data['v2'] = v2.tolist()
+                    pose_data['v1_norm'] = float(np.linalg.norm(v1))
+                    pose_data['v2_norm'] = float(np.linalg.norm(v2))
 
             # Save to JSON
             pose_path = os.path.join(self.log_dir, f"step_{step:06d}.json")
@@ -972,9 +998,14 @@ class PoseLogger(Callback):
         csv_path = os.path.join(self.log_dir, "pose_history.csv")
         file_exists = os.path.exists(csv_path)
 
-        # Flatten rotation matrix into 9 separate columns
-        fieldnames = ['step', 'translation_x', 'translation_y', 'translation_z',
-                      'rotation_det', 'orthogonality_error']
+        # Build fieldnames based on augmentation type
+        fieldnames = ['step']
+
+        # Only include translation columns for SE(3) augmentation
+        if self.augmentation_kind == "se3":
+            fieldnames.extend(['translation_x', 'translation_y', 'translation_z'])
+
+        fieldnames.extend(['rotation_det', 'orthogonality_error', 'v1_norm', 'v2_norm'])
         for i in range(3):
             for j in range(3):
                 fieldnames.append(f'rotation_{i}{j}')
@@ -988,18 +1019,21 @@ class PoseLogger(Callback):
             # Build row
             row = {
                 'step': step,
-                'translation_x': None,
-                'translation_y': None,
-                'translation_z': None,
                 'rotation_det': pose_data['rotation_det'],
                 'orthogonality_error': pose_data['orthogonality_error'],
+                'v1_norm': pose_data['v1_norm'],
+                'v2_norm': pose_data['v2_norm'],
             }
 
-            # Add translation entries
-            if pose_data['translation'] and len(pose_data['translation']) >= 3:
-                row['translation_x'] = pose_data['translation'][0]
-                row['translation_y'] = pose_data['translation'][1]
-                row['translation_z'] = pose_data['translation'][2]
+            # Add translation entries ONLY for SE(3)
+            if self.augmentation_kind == "se3":
+                row['translation_x'] = None
+                row['translation_y'] = None
+                row['translation_z'] = None
+                if pose_data['translation'] and len(pose_data['translation']) >= 3:
+                    row['translation_x'] = pose_data['translation'][0]
+                    row['translation_y'] = pose_data['translation'][1]
+                    row['translation_z'] = pose_data['translation'][2]
 
             # Add rotation matrix entries
             if pose_data['rotation']:

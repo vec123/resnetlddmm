@@ -235,6 +235,7 @@ class GroupEncoder(nn.Module):
 
         # Extract v1, v2 for rotation matrix (2 vectors -> 3x3 R)
         v1, v2 = vec_graph[:, 0, :], vec_graph[:, 1, :]
+
         rot_matrix = self.get_rotation_matrix_from_two_vectors(v1, v2)
 
         # Translation: center of mass (over the pooled token set). Area-weighted when
@@ -253,10 +254,15 @@ class GroupEncoder(nn.Module):
 
         # For SO(3) training, translation often doesn't require gradients (it's not used anyway)
         # This is expected and OK—only rotation matters for SO(3)
-        
+
+        # Store the raw pose vectors (v1, v2) in aux for logging
+        aux_data = latent_out.aux.copy() if latent_out.aux else {}
+        aux_data['v1'] = v1
+        aux_data['v2'] = v2
+
         # Attach the pose to whatever latent fields the head produced, without this
         # method needing to know which kind of head it holds.
-        return replace(latent_out, rotation=rot_matrix, translation=transl)
+        return replace(latent_out, rotation=rot_matrix, translation=transl, aux=aux_data)
     
 
     def get_rotation_matrix_from_two_vectors(self, v1, v2):

@@ -475,7 +475,8 @@ def run(cfg: ExperimentCfg, callbacks=None):
     # Add PoseLogger if using encoder pose
     if getattr(cfg, 'use_encoder_pose', False):
         pose_log_cadence = getattr(cfg.train, 'log_every', 50)
-        callbacks.append(PoseLogger(every_n_steps=pose_log_cadence))
+        augmentation_kind = cfg.augmentation.kind if hasattr(cfg, 'augmentation') else 'se3'
+        callbacks.append(PoseLogger(every_n_steps=pose_log_cadence, augmentation_kind=augmentation_kind))
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,
