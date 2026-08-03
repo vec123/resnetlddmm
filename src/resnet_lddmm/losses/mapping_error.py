@@ -12,41 +12,79 @@ from src.vtk.io import save_vtp
 logger = logging.getLogger(__name__)
 
 
-def _subsample_cloud(
+def _draw_indices(n_points: int, n_subsample: Optional[int], device) -> Optional[Tensor]:
+    """Draw the vertex subset for ONE cloud, or None when subsampling does not apply.
+
+    Args:
+        n_points: N, the cloud's vertex count
+        n_subsample: target count; None/<=0 disables, as does N <= n_subsample
+        device: device to allocate the index tensor on
+
+    Returns:
+        [n_subsample] index tensor, or None when the cloud passes through whole
+    """
+    if n_subsample is None or n_subsample <= 0 or n_points <= n_subsample:
+        return None
+    return torch.randperm(n_points, device=device)[:n_subsample]
+
+
+def _take_vertices(
     points: Tensor,
     weights: Optional[Tensor],
-    n_subsample: Optional[int],
+    idx: Optional[Tensor],
     label: str,
 ) -> Tuple[Tensor, Optional[Tensor]]:
-    """Randomly subsample ONE point cloud: points and per-vertex weights together.
+    """Apply one cloud's index draw to its points and its per-vertex weights.
 
-    The index draw happens once per cloud and is applied to every per-vertex tensor
-    of that cloud. Drawing once per TENSOR instead leaves every shape valid while
-    pairing each vertex with some other vertex's weight — correctly shaped and
-    silently wrong, which is exactly what this signature makes impossible.
+    One draw per CLOUD, never one per tensor: drawing separately for weights leaves
+    every shape valid while pairing each vertex with some other vertex's weight —
+    correctly shaped and silently wrong.
 
     Args:
         points: [B, N, 3] cloud
         weights: [B, N] per-vertex weights (e.g. area), or None
-        n_subsample: target vertex count; None/<=0 disables, as does N <= n_subsample
+        idx: index draw from _draw_indices, or None to pass through unchanged
         label: cloud name, used in the shape-mismatch message
 
     Returns:
-        (points, weights) reduced to n_subsample vertices, or unchanged when
-        subsampling does not apply. weights is None whenever it was None on input.
+        (points, weights) restricted to idx. weights is None whenever it was None.
     """
-    n_points = points.shape[1]
-    if n_subsample is None or n_subsample <= 0 or n_points <= n_subsample:
+    if idx is None:
         return points, weights
 
-    if weights is not None and weights.shape[1] != n_points:
+    if weights is not None and weights.shape[1] != points.shape[1]:
         raise ValueError(
-            f"{label}: weights has {weights.shape[1]} entries for {n_points} points; "
-            f"they must describe the same vertices to be subsampled together."
+            f"{label}: weights has {weights.shape[1]} entries for {points.shape[1]} "
+            f"points; they must describe the same vertices to be subsampled together."
         )
 
-    idx = torch.randperm(n_points, device=points.device)[:n_subsample]
     return points[:, idx, :], (None if weights is None else weights[:, idx])
+
+
+def _draw_pair_indices(template_points: Tensor, sample_points: Tensor,
+                       n_subsample: Optional[int]) -> Tuple[Optional[Tensor], Optional[Tensor]]:
+    """Index draws for the template and sample clouds of one step.
+
+    Equal vertex counts mean the clouds may be in correspondence (the samples are
+    deformations of the template), so they SHARE a single draw. That keeps
+    index-based consumers valid under subsampling — the l2 data term and the rigid
+    alignment pose loss both compare row i to row i. Chamfer is permutation-invariant
+    and is unaffected either way.
+
+    Unequal counts cannot be corresponded, so they get independent draws.
+
+    Args:
+        template_points: [B, N, 3]
+        sample_points: [B, M, 3]
+        n_subsample: target vertex count; None/<=0 disables
+
+    Returns:
+        (template_idx, sample_idx), either of which may be None
+    """
+    template_idx = _draw_indices(template_points.shape[1], n_subsample, template_points.device)
+    if sample_points.shape[1] == template_points.shape[1]:
+        return template_idx, template_idx
+    return template_idx, _draw_indices(sample_points.shape[1], n_subsample, sample_points.device)
 
 
 class UnidirectionalMappingError:
@@ -82,6 +120,7 @@ class UnidirectionalMappingError:
         # requires_grad filter below, so a term can never apply an element the data
         # term dropped.
         self.last_template_points = None
+        self.last_sample_points = None
         self.last_effective_pose = (None, None)
 
     def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
@@ -101,11 +140,13 @@ class UnidirectionalMappingError:
         # Track full template vertices
         self.last_full_vertices = template.points.shape[1]
 
-        # Subsample template points before flow if configured (no weights: the
-        # unidirectional data term compares against the sample, never the template)
-        template_points, _ = _subsample_cloud(
-            template.points, None, self.subsample_n, "template"
+        # One paired draw for both clouds (shared when they are corresponded), so
+        # index-based terms stay valid. No weights on the template: the
+        # unidirectional data term compares against the sample, never the template.
+        template_idx, sample_idx = _draw_pair_indices(
+            template.points, sample.points, self.subsample_n
         )
+        template_points, _ = _take_vertices(template.points, None, template_idx, "template")
         self.last_subsample_vertices = template_points.shape[1]
 
         # Broadcast template to match code batch size (cohort: template [1,N,3], code [B,n_z])
@@ -142,12 +183,12 @@ class UnidirectionalMappingError:
         else:
             self.last_fwd_traj_full = None
 
-        # Subsample the sample cloud for data-term computation (faster Chamfer on
-        # dense clouds). Points and weights share one draw, so tgt_w[i] stays the
-        # weight OF sample_points[i].
-        sample_points, sample_weights = _subsample_cloud(
-            sample.points, sample.weights, self.subsample_n, "sample"
+        # Points and weights share one draw, so tgt_w[i] stays the weight OF
+        # sample_points[i].
+        sample_points, sample_weights = _take_vertices(
+            sample.points, sample.weights, sample_idx, "sample"
         )
+        self.last_sample_points = sample_points  # what configured terms must reuse
 
         data = data_term(pred, sample_points, tgt_w=sample_weights)
         kinetic = fwd.kinetic_energy()
@@ -322,6 +363,7 @@ class BidirectionalMappingError:
         self.last_bwd_traj_full = None
         # Inputs configured loss terms read back (see losses/terms.py)
         self.last_template_points = None
+        self.last_sample_points = None
         self.last_effective_pose = (None, None)
 
     def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
@@ -347,12 +389,16 @@ class BidirectionalMappingError:
         # Subsample template and sample before flow if configured. Each cloud gets
         # ONE draw, shared by its points and its weights: both appear as tgt_w below,
         # where entry i must be the weight of point i of the same cloud.
-        template_points, template_weights = _subsample_cloud(
-            template.points, template.weights, self.subsample_n, "template"
+        template_idx, sample_idx = _draw_pair_indices(
+            template.points, sample.points, self.subsample_n
         )
-        sample_points, sample_weights = _subsample_cloud(
-            sample.points, sample.weights, self.subsample_n, "sample"
+        template_points, template_weights = _take_vertices(
+            template.points, template.weights, template_idx, "template"
         )
+        sample_points, sample_weights = _take_vertices(
+            sample.points, sample.weights, sample_idx, "sample"
+        )
+        self.last_sample_points = sample_points  # what configured terms must reuse
 
         if self.subsample_n is not None and self.subsample_n > 0:
             self.last_subsample_vertices = self.subsample_n

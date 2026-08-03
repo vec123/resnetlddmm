@@ -157,17 +157,18 @@ def _build_loss_terms(loss_cfg):
     """
     specs = list(loss_cfg.terms)
 
-    # First-class weight for the equivariant deformation loss, configured like
-    # every other term (isometry_weight, kinetic_weight, ...). Strictly > 0 to be
-    # built at all: at 0 the term is never instantiated and its extra forward
-    # integration never runs, rather than being computed and multiplied by zero.
-    equiv_weight = float(getattr(loss_cfg, "equivariant_deformation_weight", 0.0) or 0.0)
-    if equiv_weight > 0:
-        specs.append({
-            "kind": "equivariant_deformation_loss",
-            "weight": equiv_weight,
-            "kwargs": dict(getattr(loss_cfg, "equivariant_deformation_kwargs", None) or {}),
-        })
+    # First-class weights, configured like every other term (isometry_weight,
+    # kinetic_weight, ...). Strictly > 0 to be built at all: at 0 the term is never
+    # instantiated and its extra work never runs, rather than being computed and
+    # multiplied by zero. A new gated term is one entry here.
+    for kind in ("equivariant_deformation",):
+        weight = float(getattr(loss_cfg, f"{kind}_weight", 0.0) or 0.0)
+        if weight > 0:
+            specs.append({
+                "kind": f"{kind}_loss",
+                "weight": weight,
+                "kwargs": dict(getattr(loss_cfg, f"{kind}_kwargs", None) or {}),
+            })
 
     entries, modules = [], {}
     for spec in specs:

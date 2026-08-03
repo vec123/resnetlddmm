@@ -12,7 +12,7 @@
 # term is exactly 0, since the identity commutes with every group element. A live
 # flow is what gives the term something to constrain.
 
-source: data/rabbit/identical_cohort   # 3 shapes
+source: data/rabbit/cohort   # 3 shapes
 target: data/rabbit/T90.obj            # template the flow starts from
 output_dir: outputs/rabbit_cohort_equivariance
 
@@ -79,8 +79,8 @@ loss:
   data_name: chamfer
   data_kwargs: {}
   direction: forward                   # encoder pose requires unidirectional
-  sigma: 0.05                          # data weight = 1/(2*sigma^2) = 200
-  kinetic_weight: 0.01
+  sigma: 0.001                          # data weight = 1/(2*sigma^2) = 200
+  kinetic_weight: 0.001
   code_reg_weight: 0.0
   weight_decay: 0.0001
   isometry_weight: 0.0
@@ -91,14 +91,24 @@ loss:
   # || phi(g.T) - g.phi(T) ||^2. Strictly > 0 to be computed at all: at 0 the term
   # is never built and its extra forward integration never runs. Appears in the
   # logged breakdown as `equivariant_deformation_loss` at its RAW, unweighted value.
-  equivariant_deformation_weight: 1.0
+  equivariant_deformation_weight: 10000.0
   equivariant_deformation_kwargs:
-    detach_group: true                 # train the field, don't push the pose head
-    translation: true                  # include predicted translation in g
+    # true  -> gradient reaches the VELOCITY FIELD only: both g and the latent code z
+    # are constants, so nothing flows back to the encoder. Costs one extra integration
+    # (3 per step total), since the data term's trajectory carries encoder gradient
+    # through z and cannot be reused. The loss value is unchanged either way.
+    # false -> the constraint also reaches the latent and the pose head. Caution: the
+    # term is trivially zero at g = identity, so it can then be minimised by driving R
+    # toward I instead of by making the flow equivariant -- which fights the data term.
+    field_only: true
+    # Include the predicted translation in g. Currently INERT either way: the encoder
+    # predicts a translation but with requires_grad=False, and mapping_error drops
+    # non-grad translations. Goes live with SE(3) pose training.
+    translation: false
 
 train:
   mode: cohort
-  steps: 500
+  steps: 800
   batch: 3                             # = cohort size
   lr: 0.001
   seed: 42

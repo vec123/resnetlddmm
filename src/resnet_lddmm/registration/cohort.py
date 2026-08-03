@@ -110,6 +110,7 @@ class CohortRegistration:
                 flow=self.flow,
                 code=code,
                 template_points=self.mapping_error.last_template_points,
+                sample_points=self.mapping_error.last_sample_points,
                 fwd_traj=fwd_traj,
                 bwd_traj=self.backward_traj,
                 pred=None,
@@ -142,10 +143,6 @@ class CohortRegistration:
 
         if debug_gradients:
             self._log_gradient_stats()
-
-        # Clip gradients to stabilize training (all param groups)
-        for param_group in self.optimizer.param_groups:
-            torch.nn.utils.clip_grad_norm_(param_group['params'], max_norm=0.1)
 
         self.optimizer.step()
         return traj, loss.item(), breakdown

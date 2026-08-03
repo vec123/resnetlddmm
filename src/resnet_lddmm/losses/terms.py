@@ -34,6 +34,7 @@ class LossContext:
     flow: Any = None                                   # NeuralODEFlow | IdentityFlowWrapper
     code: Optional[Tensor] = None                      # [B, n_z] or None
     template_points: Optional[Tensor] = None           # [B, N, 3] exactly as flowed
+    sample_points: Optional[Tensor] = None             # [B, M, 3] exactly as compared against
     fwd_traj: Any = None                               # Trajectory
     bwd_traj: Any = None                               # Trajectory, bidirectional only
     pred: Optional[Tensor] = None                      # posed endpoint the data term saw
@@ -90,18 +91,29 @@ class EquivariantDeformationLoss(nn.Module):
     positive for an MLP field, where it is a genuine soft constraint.
     """
 
-    def __init__(self, detach_group: bool = True, translation: bool = True):
+    def __init__(self, field_only: bool = True, translation: bool = True):
         """Initialize the equivariance term.
 
         Args:
-            detach_group: treat g as a constant, so the term trains the FIELD only
-                and cannot push the encoder's pose head around. Set False to let
-                the constraint backpropagate into the predicted pose as well.
+            field_only: route the gradient to the VELOCITY FIELD alone. Both the
+                group element g and the latent code z are treated as constants, so
+                nothing reaches the encoder — neither its pose head via g nor its
+                latent path via z. This costs one extra integration: the forward
+                trajectory the data term computed carries encoder gradient through
+                z, so it cannot be reused for the right-hand side and is recomputed
+                against the detached code. The loss VALUE is identical either way;
+                only gradient routing and cost change.
+
+                False keeps the cheap path (reuse that trajectory, detach nothing),
+                letting the constraint reach the field, the latent, and the pose
+                head. Beware: the term is trivially zero at g = identity, so it can
+                then be minimised by collapsing the predicted rotation rather than
+                by making the flow equivariant.
             translation: include the predicted translation in g. Rotation-only
                 (False) isolates the SO(3) part of the constraint.
         """
         super().__init__()
-        self.detach_group = detach_group
+        self.field_only = field_only
         self.translation = translation
 
     def forward(self, ctx: LossContext) -> Optional[Tensor]:
@@ -120,15 +132,23 @@ class EquivariantDeformationLoss(nn.Module):
         if rotation is None and translation is None:
             return None
 
-        if self.detach_group:
+        code = ctx.code
+        if self.field_only:
             rotation = None if rotation is None else rotation.detach()
             translation = None if translation is None else translation.detach()
+            code = None if code is None else code.detach()
+            # ctx.fwd_traj was built with the LIVE code, so reusing it would leak
+            # gradient into the encoder. Recompute against the detached code: same
+            # numbers, but a graph that stops at the field.
+            deformed = ctx.flow(ctx.template_points, code).end
+        else:
+            deformed = ctx.fwd_traj.end
 
         # Flow the POSED template. Same tensor the forward trajectory started from,
         # so lhs[i] and rhs[i] describe the same vertex.
         posed_template = apply_pose(ctx.template_points, rotation, translation)
-        lhs = ctx.flow(posed_template, ctx.code).end          # φ(g·T)
+        lhs = ctx.flow(posed_template, code).end              # φ(g·T)
 
-        rhs = apply_pose(ctx.fwd_traj.end, rotation, translation)  # g·φ(T)
+        rhs = apply_pose(deformed, rotation, translation)     # g·φ(T)
 
         return (lhs - rhs).pow(2).sum(-1).mean()

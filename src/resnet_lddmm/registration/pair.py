@@ -114,6 +114,7 @@ class PairRegistration:
                 flow=self.flow,
                 code=code,
                 template_points=self.mapping_error.last_template_points,
+                sample_points=self.mapping_error.last_sample_points,
                 fwd_traj=fwd_traj,
                 bwd_traj=self.backward_traj,
                 pred=None,

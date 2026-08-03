@@ -106,20 +106,56 @@ class TestEquivariantDeformationLoss:
 
         assert value.item() > 0
 
-    def test_detach_group_keeps_gradient_off_the_pose(self):
-        """detach_group=True trains the field without pushing the pose head."""
+    def test_field_only_keeps_gradient_off_the_pose(self):
+        """field_only=True trains the field without pushing the pose head."""
         torch.manual_seed(0)
         flow = _flow(active=True)
         points = torch.randn(1, 32, 3)
         rotation = _rotation(0.9).requires_grad_(True)
 
-        EquivariantDeformationLoss(detach_group=True)(_context(flow, points, rotation)).backward()
+        EquivariantDeformationLoss(field_only=True)(_context(flow, points, rotation)).backward()
         assert rotation.grad is None
         assert any(p.grad is not None for p in flow.field.parameters())
 
         rotation2 = _rotation(0.9).requires_grad_(True)
-        EquivariantDeformationLoss(detach_group=False)(_context(flow, points, rotation2)).backward()
+        EquivariantDeformationLoss(field_only=False)(_context(flow, points, rotation2)).backward()
         assert rotation2.grad is not None
+
+    def test_field_only_keeps_gradient_off_the_latent(self):
+        """field_only=True also blocks the encoder's LATENT path, not just the pose.
+
+        Needs a conditioned field, since the default field ignores the code entirely
+        and the test would pass vacuously.
+        """
+        from src.resnet_lddmm.conditioning.film import FiLMConditioning
+
+        torch.manual_seed(0)
+        field = TimeVaryingField(num_blocks=3, width=32,
+                                 conditioning=FiLMConditioning(n_z=8, output_dim=3))
+        with torch.no_grad():
+            for param in field.parameters():
+                param.add_(torch.randn_like(param) * 0.5)
+        flow = NeuralODEFlow(field, direct=ForwardEuler(), inverse=ModifiedEuler(), num_steps=3)
+        points = torch.randn(1, 32, 3)
+
+        base_code = torch.randn(1, 8)   # SAME code both ways, else the values differ
+
+        def run(field_only):
+            code = base_code.clone().requires_grad_(True)
+            traj = flow(points, code)
+            ctx = LossContext(flow=flow, code=code, template_points=points,
+                              fwd_traj=traj, encoder_pose=(_rotation(0.9), None))
+            value = EquivariantDeformationLoss(field_only=field_only)(ctx)
+            value.backward()
+            return code.grad, value.item()
+
+        grad_blocked, value_blocked = run(True)
+        grad_open, value_open = run(False)
+
+        assert grad_blocked is None       # nothing reaches the encoder
+        assert grad_open is not None      # the cheap path does
+        # Same objective either way -- only the routing differs.
+        assert value_blocked == pytest.approx(value_open, rel=1e-6)
 
     def test_translation_can_be_excluded(self):
         """translation=False isolates the SO(3) part of the constraint."""
@@ -180,15 +216,15 @@ class TestLossTermWiring:
     """cfg.loss.terms -> composer entries + stepper-visible modules."""
 
     def test_registry_resolves_the_term(self):
-        term = Registry.create("loss_term", "equivariant_deformation_loss", detach_group=False)
+        term = Registry.create("loss_term", "equivariant_deformation_loss", field_only=False)
         assert isinstance(term, EquivariantDeformationLoss)
-        assert term.detach_group is False
+        assert term.field_only is False
 
     def test_build_loss_terms(self):
         from src.resnet_lddmm.runner import _build_loss_terms
 
         cfg = SimpleNamespace(terms=[
-            {"kind": "equivariant_deformation_loss", "weight": 2.5, "kwargs": {"detach_group": False}},
+            {"kind": "equivariant_deformation_loss", "weight": 2.5, "kwargs": {"field_only": False}},
             {"kind": "equivariant_deformation_loss", "name": "equiv_so3", "weight": 1.0,
              "kwargs": {"translation": False}},
             {"kind": "equivariant_deformation_loss", "name": "disabled", "weight": 0.0},
@@ -198,7 +234,7 @@ class TestLossTermWiring:
         assert [e.name for e in entries] == ["equivariant_deformation_loss", "equiv_so3"]
         assert [e.weight for e in entries] == [2.5, 1.0]
         assert set(modules) == {"equivariant_deformation_loss", "equiv_so3"}   # weight 0 dropped
-        assert modules["equivariant_deformation_loss"].detach_group is False
+        assert modules["equivariant_deformation_loss"].field_only is False
         assert modules["equiv_so3"].translation is False
 
     def test_empty_terms_is_inert(self):
@@ -219,12 +255,12 @@ class TestLossTermWiring:
         assert _build_loss_terms(off) == ([], {})
 
         on = SimpleNamespace(terms=[], equivariant_deformation_weight=0.25,
-                             equivariant_deformation_kwargs={"detach_group": False})
+                             equivariant_deformation_kwargs={"field_only": False})
         entries, modules = _build_loss_terms(on)
 
         assert [e.name for e in entries] == ["equivariant_deformation_loss"]
         assert entries[0].weight == 0.25
-        assert modules["equivariant_deformation_loss"].detach_group is False
+        assert modules["equivariant_deformation_loss"].field_only is False
 
     def test_negative_weight_also_gates(self):
         from src.resnet_lddmm.runner import _build_loss_terms
