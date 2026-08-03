@@ -4,12 +4,55 @@ from typing import Tuple, Optional
 import torch
 from torch import Tensor
 from src.transforms.group_transforms import SE3_transform
+import logging
+from pathlib import Path
+from src.vtk.create import create_polydata
+from src.vtk.io import save_vtp
+
+logger = logging.getLogger(__name__)
+
+
+def _subsample_cloud(
+    points: Tensor,
+    weights: Optional[Tensor],
+    n_subsample: Optional[int],
+    label: str,
+) -> Tuple[Tensor, Optional[Tensor]]:
+    """Randomly subsample ONE point cloud: points and per-vertex weights together.
+
+    The index draw happens once per cloud and is applied to every per-vertex tensor
+    of that cloud. Drawing once per TENSOR instead leaves every shape valid while
+    pairing each vertex with some other vertex's weight — correctly shaped and
+    silently wrong, which is exactly what this signature makes impossible.
+
+    Args:
+        points: [B, N, 3] cloud
+        weights: [B, N] per-vertex weights (e.g. area), or None
+        n_subsample: target vertex count; None/<=0 disables, as does N <= n_subsample
+        label: cloud name, used in the shape-mismatch message
+
+    Returns:
+        (points, weights) reduced to n_subsample vertices, or unchanged when
+        subsampling does not apply. weights is None whenever it was None on input.
+    """
+    n_points = points.shape[1]
+    if n_subsample is None or n_subsample <= 0 or n_points <= n_subsample:
+        return points, weights
+
+    if weights is not None and weights.shape[1] != n_points:
+        raise ValueError(
+            f"{label}: weights has {weights.shape[1]} entries for {n_points} points; "
+            f"they must describe the same vertices to be subsampled together."
+        )
+
+    idx = torch.randperm(n_points, device=points.device)[:n_subsample]
+    return points[:, idx, :], (None if weights is None else weights[:, idx])
 
 
 class UnidirectionalMappingError:
     """Forward-only mapping error: D(φ(T), S) and kinetic energy of forward trajectory.
 
-    Used for per-pair registration (Milestone A). Computes data term and kinetic
+    Used for per-pair registration. Computes data term and kinetic
     energy over the forward trajectory only. Flow deforms template to match sample.
 
     Supports optional random subsampling for computational efficiency on high-density shapes:
@@ -17,6 +60,8 @@ class UnidirectionalMappingError:
     but flow is only computed on subsampled template. Tracks full and subsampled vertex counts.
     Optionally computes and stores full trajectory when save_full=True.
     """
+
+    pose_call_counter = 0  # Counter for pose transformation debugging
 
     def __init__(self, subsample_n: Optional[int] = None, save_full: bool = False):
         """Initialize mapping error.
@@ -50,13 +95,12 @@ class UnidirectionalMappingError:
         # Track full template vertices
         self.last_full_vertices = template.points.shape[1]
 
-        # Subsample template points before flow if configured
-        template_points = template.points
-        if self.subsample_n is not None and self.subsample_n > 0:
-            template_points = self._subsample_points(template_points, self.subsample_n)
-            self.last_subsample_vertices = template_points.shape[1]
-        else:
-            self.last_subsample_vertices = self.last_full_vertices
+        # Subsample template points before flow if configured (no weights: the
+        # unidirectional data term compares against the sample, never the template)
+        template_points, _ = _subsample_cloud(
+            template.points, None, self.subsample_n, "template"
+        )
+        self.last_subsample_vertices = template_points.shape[1]
 
         # Broadcast template to match code batch size (cohort: template [1,N,3], code [B,n_z])
         if template_points.shape[0] == 1 and code is not None and code.shape[0] > 1:
@@ -89,37 +133,114 @@ class UnidirectionalMappingError:
         else:
             self.last_fwd_traj_full = None
 
-        # Subsample sample points for data-term computation (faster Chamfer on dense clouds)
-        sample_points = sample.points
-        sample_weights = sample.weights
-        if self.subsample_n is not None and self.subsample_n > 0:
-            sample_points = self._subsample_points(sample_points, self.subsample_n)
-            # Subsample weights if present
-            if sample_weights is not None:
-                sample_weights = self._subsample_points(sample_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
+        # Subsample the sample cloud for data-term computation (faster Chamfer on
+        # dense clouds). Points and weights share one draw, so tgt_w[i] stays the
+        # weight OF sample_points[i].
+        sample_points, sample_weights = _subsample_cloud(
+            sample.points, sample.weights, self.subsample_n, "sample"
+        )
 
         data = data_term(pred, sample_points, tgt_w=sample_weights)
         kinetic = fwd.kinetic_energy()
         return data, kinetic
 
     @staticmethod
-    def _subsample_points(points: Tensor, n_subsample: int) -> Tensor:
-        """Randomly subsample points.
+    def _log_pose_transform(label: str, points_before: Tensor, rotation: Optional[Tensor],
+                            translation: Optional[Tensor], points_after: Tensor):
+        """Log detailed information about pose transformation.
 
         Args:
-            points: [B, N, 3] point tensor
-            n_subsample: number of points to keep
-
-        Returns:
-            Subsampled [B, n_subsample, 3] tensor (or input if N <= n_subsample)
+            label: context label (e.g., "UniDirectional", "BiDirectional fwd", "BiDirectional bwd")
+            points_before: [B, N, 3] before transformation
+            rotation: [B, 3, 3] or None
+            translation: [B, 3] or None
+            points_after: [B, N, 3] after transformation
         """
-        B, N, D = points.shape
-        if N <= n_subsample:
-            return points
+        B, N, D = points_before.shape
+        logger.info(f"\n{'='*70}")
+        logger.info(f"[ENCODER_POSE] {label}")
+        logger.info(f"{'='*70}")
 
-        # Randomly select indices (same for all batch elements)
-        indices = torch.randperm(N, device=points.device)[:n_subsample]
-        return points[:, indices, :]
+        # Log input shape
+        logger.info(f"Shape: batch={B}, points={N}, dims={D}")
+
+        # Log rotation
+        if rotation is not None:
+            logger.info(f"\nRotation matrix [B,3,3]:")
+            for b in range(min(B, 2)):  # Log first 2 batch elements
+                logger.info(f"  Batch {b}:\n{rotation[b]}")
+                # Check orthogonality
+                R = rotation[b]
+                det = torch.det(R)
+                ortho_error = (R @ R.T - torch.eye(3, device=R.device)).norm()
+                logger.info(f"    det(R) = {det.item():.6f}, orthogonality_error = {ortho_error.item():.6e}")
+        else:
+            logger.info("Rotation: None")
+
+        # Log translation
+        if translation is not None:
+            logger.info(f"\nTranslation vector [B,3]:")
+            for b in range(min(B, 2)):
+                logger.info(f"  Batch {b}: {translation[b]}")
+        else:
+            logger.info("Translation: None")
+
+        # Log point cloud statistics before
+        logger.info(f"\nBefore transformation:")
+        points_before_reshaped = points_before.view(-1, 3)
+        logger.info(f"  Mean: {points_before_reshaped.mean(0)}")
+        logger.info(f"  Std:  {points_before_reshaped.std(0)}")
+        logger.info(f"  Min:  {points_before_reshaped.min(0)[0]}")
+        logger.info(f"  Max:  {points_before_reshaped.max(0)[0]}")
+        if N > 0:
+            logger.info(f"  First 3 points (batch 0):\n{points_before[0, :3]}")
+
+        # Log point cloud statistics after
+        logger.info(f"\nAfter transformation:")
+        points_after_reshaped = points_after.view(-1, 3)
+        logger.info(f"  Mean: {points_after_reshaped.mean(0)}")
+        logger.info(f"  Std:  {points_after_reshaped.std(0)}")
+        logger.info(f"  Min:  {points_after_reshaped.min(0)[0]}")
+        logger.info(f"  Max:  {points_after_reshaped.max(0)[0]}")
+        if N > 0:
+            logger.info(f"  First 3 points (batch 0):\n{points_after[0, :3]}")
+
+        # Log change
+        point_change = (points_after - points_before).view(-1, 3)
+        logger.info(f"\nPoint change (after - before):")
+        logger.info(f"  Mean: {point_change.mean(0)}")
+        logger.info(f"  Std:  {point_change.std(0)}")
+        logger.info(f"  Max:  {point_change.abs().max(0)[0]}")
+
+        # Save VTP files for visualization
+        try:
+            call_counter = getattr(UnidirectionalMappingError, 'pose_call_counter', 0) if B > 0 else getattr(BidirectionalMappingError, 'pose_call_counter', 0)
+            if B > 0:
+                UnidirectionalMappingError.pose_call_counter = call_counter + 1
+                call_idx = UnidirectionalMappingError.pose_call_counter
+            else:
+                BidirectionalMappingError.pose_call_counter = call_counter + 1
+                call_idx = BidirectionalMappingError.pose_call_counter
+            output_dir = Path("outputs/encoder_pose_debug") / f"call_{call_idx:06d}" / label.lower().replace(" ", "_")
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save before and after for first 2 batch elements
+            for b in range(min(B, 2)):
+                batch_label = f"batch_{b}" if B > 1 else ""
+                before_path = output_dir / f"before_{batch_label}.vtp"
+                after_path = output_dir / f"after_{batch_label}.vtp"
+
+                before_poly = create_polydata(points_before[b:b+1])
+                after_poly = create_polydata(points_after[b:b+1])
+
+                save_vtp(before_poly, str(before_path))
+                save_vtp(after_poly, str(after_path))
+
+            logger.info(f"VTP files saved to: {output_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to save VTP files: {e}")
+
+        logger.info(f"{'='*70}\n")
 
     @staticmethod
     def _apply_encoder_pose(points: Tensor, rotation: Optional[Tensor],
@@ -138,6 +259,7 @@ class UnidirectionalMappingError:
             return points
 
         B, N, D = points.shape
+        points_before = points.detach().clone() if logger.isEnabledFor(logging.INFO) else None
 
         # Apply rotation: einsum preserves gradients better than SE3_transform
         # 'bij,bjk->bik' means: for each batch b, [N,3] @ [3,3] = [N,3]
@@ -148,13 +270,19 @@ class UnidirectionalMappingError:
         if translation is not None:
             points = points + translation.unsqueeze(1)  # [B,1,3] + [B,N,3]
 
+        # Log if enabled
+        if logger.isEnabledFor(logging.INFO) and points_before is not None:
+            UnidirectionalMappingError._log_pose_transform(
+                "UniDirectional", points_before, rotation, translation, points
+            )
+
         return points
 
 
 class BidirectionalMappingError:
     """Bidirectional mapping error: D(φ(T), S) + D(φ⁻¹(S), T).
 
-    Used for cohort registration (Milestone B). Computes data term and kinetic
+    Used for cohort registration. Computes data term and kinetic
     energy summed over both forward and backward trajectories (AD-SVFD Eq. loss function).
     Forward: deform template to match sample. Backward: inverse flow from sample.
 
@@ -163,6 +291,8 @@ class BidirectionalMappingError:
     but flows are computed on subsampled points. Tracks full and subsampled vertex counts.
     Optionally computes and stores full trajectories when save_full=True.
     """
+
+    pose_call_counter = 0  # Counter for pose transformation debugging
 
     def __init__(self, subsample_n: Optional[int] = None, save_full: bool = False):
         """Initialize mapping error.
@@ -202,20 +332,17 @@ class BidirectionalMappingError:
         self.last_full_source_vertices = template.points.shape[1]
         self.last_full_target_vertices = sample.points.shape[1]
 
-        # Subsample template and sample before flow if configured
-        template_points = template.points
-        sample_points = sample.points
-        template_weights = template.weights
-        sample_weights = sample.weights
+        # Subsample template and sample before flow if configured. Each cloud gets
+        # ONE draw, shared by its points and its weights: both appear as tgt_w below,
+        # where entry i must be the weight of point i of the same cloud.
+        template_points, template_weights = _subsample_cloud(
+            template.points, template.weights, self.subsample_n, "template"
+        )
+        sample_points, sample_weights = _subsample_cloud(
+            sample.points, sample.weights, self.subsample_n, "sample"
+        )
 
         if self.subsample_n is not None and self.subsample_n > 0:
-            template_points = self._subsample_points(template_points, self.subsample_n)
-            sample_points = self._subsample_points(sample_points, self.subsample_n)
-            # Subsample weights if present
-            if template_weights is not None:
-                template_weights = self._subsample_points(template_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
-            if sample_weights is not None:
-                sample_weights = self._subsample_points(sample_weights.unsqueeze(-1), self.subsample_n).squeeze(-1)
             self.last_subsample_vertices = self.subsample_n
         else:
             self.last_subsample_vertices = None
@@ -254,8 +381,13 @@ class BidirectionalMappingError:
             # For SO(3)-only training, skip translation to avoid breaking gradient flow
             if translation is not None and not translation.requires_grad:
                 translation = None
+            fwd_end_before = fwd_end.detach().clone() if logger.isEnabledFor(logging.INFO) else None
+            bwd_end_before = bwd_end.detach().clone() if logger.isEnabledFor(logging.INFO) else None
             fwd_end = self._apply_encoder_pose(fwd_end, rotation, translation)
             bwd_end = self._apply_encoder_pose(bwd_end, rotation, translation)
+            if logger.isEnabledFor(logging.INFO):
+                BidirectionalMappingError._log_pose_transform("BiDirectional fwd", fwd_end_before, rotation, translation, fwd_end)
+                BidirectionalMappingError._log_pose_transform("BiDirectional bwd", bwd_end_before, rotation, translation, bwd_end)
 
         # Data term: forward distance + backward distance (both on subsampled points)
         data = (
@@ -267,6 +399,104 @@ class BidirectionalMappingError:
         kinetic = fwd.kinetic_energy() + bwd.kinetic_energy()
 
         return data, kinetic
+
+    @staticmethod
+    def _log_pose_transform(label: str, points_before: Tensor, rotation: Optional[Tensor],
+                            translation: Optional[Tensor], points_after: Tensor):
+        """Log detailed information about pose transformation.
+
+        Args:
+            label: context label (e.g., "UniDirectional", "BiDirectional fwd", "BiDirectional bwd")
+            points_before: [B, N, 3] before transformation
+            rotation: [B, 3, 3] or None
+            translation: [B, 3] or None
+            points_after: [B, N, 3] after transformation
+        """
+        B, N, D = points_before.shape
+        logger.info(f"\n{'='*70}")
+        logger.info(f"[ENCODER_POSE] {label}")
+        logger.info(f"{'='*70}")
+
+        # Log input shape
+        logger.info(f"Shape: batch={B}, points={N}, dims={D}")
+
+        # Log rotation
+        if rotation is not None:
+            logger.info(f"\nRotation matrix [B,3,3]:")
+            for b in range(min(B, 2)):  # Log first 2 batch elements
+                logger.info(f"  Batch {b}:\n{rotation[b]}")
+                # Check orthogonality
+                R = rotation[b]
+                det = torch.det(R)
+                ortho_error = (R @ R.T - torch.eye(3, device=R.device)).norm()
+                logger.info(f"    det(R) = {det.item():.6f}, orthogonality_error = {ortho_error.item():.6e}")
+        else:
+            logger.info("Rotation: None")
+
+        # Log translation
+        if translation is not None:
+            logger.info(f"\nTranslation vector [B,3]:")
+            for b in range(min(B, 2)):
+                logger.info(f"  Batch {b}: {translation[b]}")
+        else:
+            logger.info("Translation: None")
+
+        # Log point cloud statistics before
+        logger.info(f"\nBefore transformation:")
+        points_before_reshaped = points_before.view(-1, 3)
+        logger.info(f"  Mean: {points_before_reshaped.mean(0)}")
+        logger.info(f"  Std:  {points_before_reshaped.std(0)}")
+        logger.info(f"  Min:  {points_before_reshaped.min(0)[0]}")
+        logger.info(f"  Max:  {points_before_reshaped.max(0)[0]}")
+        if N > 0:
+            logger.info(f"  First 3 points (batch 0):\n{points_before[0, :3]}")
+
+        # Log point cloud statistics after
+        logger.info(f"\nAfter transformation:")
+        points_after_reshaped = points_after.view(-1, 3)
+        logger.info(f"  Mean: {points_after_reshaped.mean(0)}")
+        logger.info(f"  Std:  {points_after_reshaped.std(0)}")
+        logger.info(f"  Min:  {points_after_reshaped.min(0)[0]}")
+        logger.info(f"  Max:  {points_after_reshaped.max(0)[0]}")
+        if N > 0:
+            logger.info(f"  First 3 points (batch 0):\n{points_after[0, :3]}")
+
+        # Log change
+        point_change = (points_after - points_before).view(-1, 3)
+        logger.info(f"\nPoint change (after - before):")
+        logger.info(f"  Mean: {point_change.mean(0)}")
+        logger.info(f"  Std:  {point_change.std(0)}")
+        logger.info(f"  Max:  {point_change.abs().max(0)[0]}")
+
+        # Save VTP files for visualization
+        try:
+            call_counter = getattr(UnidirectionalMappingError, 'pose_call_counter', 0) if B > 0 else getattr(BidirectionalMappingError, 'pose_call_counter', 0)
+            if B > 0:
+                UnidirectionalMappingError.pose_call_counter = call_counter + 1
+                call_idx = UnidirectionalMappingError.pose_call_counter
+            else:
+                BidirectionalMappingError.pose_call_counter = call_counter + 1
+                call_idx = BidirectionalMappingError.pose_call_counter
+            output_dir = Path("outputs/encoder_pose_debug") / f"call_{call_idx:06d}" / label.lower().replace(" ", "_")
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save before and after for first 2 batch elements
+            for b in range(min(B, 2)):
+                batch_label = f"batch_{b}" if B > 1 else ""
+                before_path = output_dir / f"before_{batch_label}.vtp"
+                after_path = output_dir / f"after_{batch_label}.vtp"
+
+                before_poly = create_polydata(points_before[b:b+1])
+                after_poly = create_polydata(points_after[b:b+1])
+
+                save_vtp(before_poly, str(before_path))
+                save_vtp(after_poly, str(after_path))
+
+            logger.info(f"VTP files saved to: {output_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to save VTP files: {e}")
+
+        logger.info(f"{'='*70}\n")
 
     @staticmethod
     def _apply_encoder_pose(points: Tensor, rotation: Optional[Tensor],
@@ -296,22 +526,3 @@ class BidirectionalMappingError:
             points = points + translation.unsqueeze(1)  # [B,1,3] + [B,N,3]
 
         return points
-
-    @staticmethod
-    def _subsample_points(points: Tensor, n_subsample: int) -> Tensor:
-        """Randomly subsample points.
-
-        Args:
-            points: [B, N, 3] point tensor
-            n_subsample: number of points to keep
-
-        Returns:
-            Subsampled [B, n_subsample, 3] tensor (or input if N <= n_subsample)
-        """
-        B, N, D = points.shape
-        if N <= n_subsample:
-            return points
-
-        # Randomly select indices (same for all batch elements)
-        indices = torch.randperm(N, device=points.device)[:n_subsample]
-        return points[:, indices, :]

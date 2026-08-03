@@ -421,3 +421,81 @@ class TestMappingErrorIntegration:
 
         # Should be finite
         assert torch.isfinite(data)
+
+
+class _SpyDataTerm:
+    """Records the (target, tgt_w) pair each data-term call received."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, pred, target, pred_w=None, tgt_w=None, normals=None):
+        self.calls.append(
+            (target.detach().clone(), None if tgt_w is None else tgt_w.detach().clone())
+        )
+        return pred.new_zeros(())
+
+
+class TestSubsampleKeepsWeightsPaired:
+    """Subsampling must keep tgt_w[i] the weight OF target[i].
+
+    Each cloud carries a fingerprint (weights == x-coordinate), so decoupling points
+    from weights breaks an invariant instead of a shape — which is how drawing a
+    separate index per tensor stayed invisible: it produced correctly shaped,
+    wrongly indexed weights that only WeightedCDData/Sinkhorn/EMD ever read.
+    """
+
+    @staticmethod
+    def _cloud(n, batch=1):
+        points = torch.randn(batch, n, 3)
+        return SimpleNamespace(points=points, weights=points[:, :, 0].clone())
+
+    @staticmethod
+    def _flow():
+        field = TimeVaryingField(num_blocks=3, width=32)
+        return NeuralODEFlow(field, direct=ForwardEuler(), inverse=ModifiedEuler(), num_steps=3)
+
+    def test_unidirectional_pairs_sample_weights(self):
+        """The sample's points and weights survive subsampling as one cloud."""
+        spy = _SpyDataTerm()
+        error = UnidirectionalMappingError(subsample_n=10)
+
+        error(self._flow(), spy, self._cloud(50), self._cloud(40), None)
+
+        (target, tgt_w), = spy.calls
+        assert target.shape[1] == 10
+        assert tgt_w.shape == (1, 10)
+        assert torch.equal(tgt_w, target[:, :, 0])
+
+    def test_bidirectional_pairs_both_clouds(self):
+        """Both data-term calls get weights matching the points they accompany."""
+        spy = _SpyDataTerm()
+        error = BidirectionalMappingError(subsample_n=10)
+
+        error(self._flow(), spy, self._cloud(50), self._cloud(40), None)
+
+        assert len(spy.calls) == 2
+        for target, tgt_w in spy.calls:
+            assert target.shape[1] == 10
+            assert torch.equal(tgt_w, target[:, :, 0])
+
+    def test_weights_untouched_without_subsampling(self):
+        """subsample_n=None passes points and weights through unchanged."""
+        spy = _SpyDataTerm()
+        sample = self._cloud(40)
+
+        UnidirectionalMappingError()(self._flow(), spy, self._cloud(50), sample, None)
+
+        (target, tgt_w), = spy.calls
+        assert torch.equal(target, sample.points)
+        assert torch.equal(tgt_w, sample.weights)
+
+    def test_mismatched_weights_raise(self):
+        """A cloud whose weights don't count its own vertices fails loudly."""
+        sample = self._cloud(50)
+        sample.weights = torch.randn(1, 49)  # one weight short of its points
+
+        with pytest.raises(ValueError, match="must describe the same vertices"):
+            UnidirectionalMappingError(subsample_n=10)(
+                self._flow(), _SpyDataTerm(), self._cloud(50), sample, None
+            )
