@@ -116,14 +116,41 @@ class EncoderCodes(ShapeCode):
         self.encoder.eval()
 
     def get_pose(self):
-        """Get encoder's last predicted pose (rotation, translation) for T32 pre-alignment.
+        """Get encoder's last predicted pose (rotation, translation), in PIPELINE convention.
+
+        The rotation is TRANSPOSED relative to what GroupEncoder returns, and that
+        transpose is load-bearing rather than cosmetic.
+
+        GroupEncoder builds its rotation by Gram-Schmidt from type-1 (vector)
+        features, so it is equivariant as ``R(x·Q) = Qᵀ·R(x)`` — identically, for
+        every weight setting, since this is a property of the e3nn construction and
+        not something training selects. But poses are applied downstream as
+        ``points @ R`` (mapping_error._apply_encoder_pose, matching SE3_transform),
+        which needs the opposite handedness: ``P(x·Q) = P(x)·Q``.
+
+        Those two cannot be reconciled by learning. Requiring both gives
+        ``Qᵀ A = A Q`` for all Q, i.e. ``Qᵀ = A Q A⁻¹`` — inversion is an
+        ANTI-automorphism while conjugation is an automorphism, and on a non-abelian
+        group such as SO(3) no such A exists. Left as-is, the pose objective is not
+        merely hard to optimise, it is unsatisfiable, and the pose head sits at
+        chance forever.
+
+        Transposing fixes it exactly: ``P := Rᵀ`` gives
+        ``P(x·Q) = (Qᵀ R(x))ᵀ = R(x)ᵀ Q = P(x)·Q``.
+
+        A side effect worth having: the returned rotation is now directly comparable
+        with the element an augmentation drew (SE3_transform uses the same ``x @ R``
+        convention), which is what makes pose supervision meaningful.
 
         Returns:
             (rotation, translation) tuple where each is [B, ...] or None if no last output
         """
         if self._last is None:
             return None, None
-        return self._last.rotation, self._last.translation
+        rotation = self._last.rotation
+        if rotation is not None:
+            rotation = rotation.transpose(-2, -1)
+        return rotation, self._last.translation
 
     def with_pose_transform(self, base_transform):
         """Create a pose-aware FrameTransform by folding encoder pose into base transform.
@@ -134,13 +161,14 @@ class EncoderCodes(ShapeCode):
         Returns:
             New FrameTransform with encoder's rotation/translation folded in, or base_transform if no pose
         """
-        if self._last is None or (self._last.rotation is None and self._last.translation is None):
+        rotation, translation = self.get_pose()   # one source of truth for the convention
+        if rotation is None and translation is None:
             return base_transform
 
         from src.resnet_lddmm.io import FrameTransform
         return FrameTransform(
             center=base_transform.center,
             scale=base_transform.scale,
-            rotation=self._last.rotation,
-            translation=self._last.translation
+            rotation=rotation,
+            translation=translation
         )
