@@ -2,7 +2,9 @@
 
 import torch
 from src.learning.losses.composer import LossComposer
+from src.resnet_lddmm.losses.terms import LossContext
 from src.resnet_lddmm.losses import BidirectionalMappingError
+from src.resnet_lddmm.io import Shape
 
 
 class PairRegistration:
@@ -14,7 +16,7 @@ class PairRegistration:
     (state_dict, load_state_dict, train, eval) for reused callbacks.
     """
 
-    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None, use_encoder_pose=False):
+    def __init__(self, flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=None, augmentation=None, use_encoder_pose=False, loss_terms=None):
         """Initialize the registration stepper.
 
         Args:
@@ -27,6 +29,7 @@ class PairRegistration:
             iso_loss: IsometryLoss instance (optional, created by runner if enabled)
             augmentation: Augmentation instance (optional; defaults to NoAugmentation)
             use_encoder_pose: bool, whether to extract and apply encoder pose from code_source
+            loss_terms: dict of {name: term module} from cfg.loss.terms (optional)
         """
         self.flow = flow
         self.code_source = code_source
@@ -37,6 +40,7 @@ class PairRegistration:
         self.iso_loss = iso_loss
         self.augmentation = augmentation
         self.use_encoder_pose = use_encoder_pose
+        self.loss_terms = loss_terms or {}
         if self.augmentation is None:
             from src.resnet_lddmm.augmentation.none import NoAugmentation
             self.augmentation = NoAugmentation()
@@ -54,14 +58,19 @@ class PairRegistration:
         Returns:
             (fwd_traj, values_dict) where values_dict has keys for data, kinetic, code_reg, isometry
         """
+        # Set template on field if it's a contextual field
+        if hasattr(self.flow.field, 'set_template'):
+            self.flow.field.set_template(template.points)
+
         # Apply augmentation to sample points (random SO(3) or SE(3) transformation)
         augmented_points = self.augmentation(sample.points)
 
         # Create augmented batch with transformed points, preserving other fields
-        augmented_sample = type(sample)(
+        augmented_sample = Shape(
             points=augmented_points,
-            weights=sample.weights,
             faces=sample.faces,
+            weights=sample.weights,
+            normals=getattr(sample, 'normals', None),
         )
 
         # Store augmented sample for logger access
@@ -96,6 +105,25 @@ class PairRegistration:
         # Add isometry loss if enabled
         if self.iso_loss is not None:
             values["isometry"] = self.iso_loss(fwd_traj, self.flow.field)
+
+        # Configured extra terms (loss.terms). Each returns a scalar or None; the
+        # composer skips None, so mode-dependent terms need no branch here. Adding
+        # a term is a registry line plus config -- this block never changes.
+        if self.loss_terms:
+            ctx = LossContext(
+                flow=self.flow,
+                code=code,
+                template_points=self.mapping_error.last_template_points,
+                fwd_traj=fwd_traj,
+                bwd_traj=self.backward_traj,
+                pred=None,
+                encoder_pose=self.mapping_error.last_effective_pose,
+                data_term=self.data_term,
+                code_source=self.code_source,
+                template=template,
+                sample=augmented_sample,
+            )
+            values.update({name: term(ctx) for name, term in self.loss_terms.items()})
 
         return fwd_traj, values
 

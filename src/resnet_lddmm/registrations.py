@@ -21,6 +21,18 @@ Registry.register("conditioning", "position_aware", "src.resnet_lddmm.conditioni
 Registry.register("field", "time_varying", "src.resnet_lddmm.fields.time_varying:TimeVaryingField")
 Registry.register("field", "stationary", "src.resnet_lddmm.fields.time_varying:StationaryField")
 
+# SO(3)-equivariant stationary field using e3nn SelfInteraction
+Registry.register("field", "equivariant_stationary", "src.resnet_lddmm.fields.equivariant:EquivariantStationaryField")
+
+# SO(3)-equivariant field with message passing over template
+Registry.register("field", "equivariant_contextual", "src.resnet_lddmm.fields.equivariant_with_context:EquivariantContextualField")
+
+# Simple equivariant contextual field using MLP aggregation
+Registry.register("field", "equivariant_contextual_simple", "src.resnet_lddmm.fields.equivariant_contextual_simple:EquivariantContextualFieldSimple")
+
+# Equivariant template field: velocity parameterized by template geometry
+Registry.register("field", "equivariant_template", "src.resnet_lddmm.fields.equivariant_template_field:EquivariantTemplateField")
+
 # STEPS T9: DataTerm + CDData + L2Data + EMDData
 Registry.register("data_term", "chamfer", "src.resnet_lddmm.losses.data_terms:CDData")
 Registry.register("data_term", "l2", "src.resnet_lddmm.losses.data_terms:L2Data")
@@ -45,6 +57,10 @@ Registry.register("code", "encoder", "src.resnet_lddmm.codes.encoder:EncoderCode
 
 # IsometryLoss (shape-preserving regularization)
 Registry.register("iso_loss", "isometry", "src.resnet_lddmm.losses.data_terms:IsometryLoss")
+
+# Config-selected loss terms (loss.terms in the YAML). Each takes a LossContext
+# and returns a scalar or None; see losses/terms.py.
+Registry.register("loss_term", "flow_equivariance", "src.resnet_lddmm.losses.terms:FlowEquivarianceTerm")
 
 # Augmentation: random group transformations (SE(3), SO(3), or none)
 Registry.register("augmentation", "none", "src.resnet_lddmm.augmentation.none:NoAugmentation")

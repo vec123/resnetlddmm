@@ -77,6 +77,12 @@ class UnidirectionalMappingError:
         self.last_subsample_vertices = None
         self.last_fwd_traj = None  # Store trajectory to avoid recomputation
         self.last_fwd_traj_full = None  # Store full trajectory if save_full=True
+        # Inputs configured loss terms read back (see losses/terms.py). The points
+        # are the ones actually flowed; the pose is the EFFECTIVE one, after the
+        # requires_grad filter below, so a term can never apply an element the data
+        # term dropped.
+        self.last_template_points = None
+        self.last_effective_pose = (None, None)
 
     def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
         """Compute unidirectional mapping error.
@@ -109,6 +115,8 @@ class UnidirectionalMappingError:
         # Flow on (possibly subsampled) template points
         fwd = flow(template_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
+        self.last_template_points = template_points  # what configured terms must reuse
+        self.last_effective_pose = (None, None)
         pred = fwd.end
 
         # Apply encoder pose if provided (transforms pred to augmented frame for comparison)
@@ -122,6 +130,7 @@ class UnidirectionalMappingError:
             if rotation is not None and not rotation.requires_grad:
                 print(f"[GRADIENT_ERROR] rotation.requires_grad=False! This breaks gradient flow to encoder.")
 
+            self.last_effective_pose = (rotation, translation)
             pred = self._apply_encoder_pose(pred, rotation, translation)
 
         # Optionally compute full trajectory for export if save_full=True
@@ -311,6 +320,9 @@ class BidirectionalMappingError:
         self.last_bwd_traj = None
         self.last_fwd_traj_full = None  # Store full trajectories if save_full=True
         self.last_bwd_traj_full = None
+        # Inputs configured loss terms read back (see losses/terms.py)
+        self.last_template_points = None
+        self.last_effective_pose = (None, None)
 
     def __call__(self, flow, data_term, template, sample, code, encoder_pose=None) -> Tuple[Tensor, Tensor]:
         """Compute bidirectional mapping error.
@@ -358,6 +370,8 @@ class BidirectionalMappingError:
         bwd = flow.inverse(sample_points, code)
         self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in cohort.py)
         self.last_bwd_traj = bwd
+        self.last_template_points = template_points  # what configured terms must reuse
+        self.last_effective_pose = (None, None)
 
         # Optionally compute full trajectories for export if save_full=True
         if self.save_full and self.subsample_n is not None and self.subsample_n > 0:
@@ -381,6 +395,7 @@ class BidirectionalMappingError:
             # For SO(3)-only training, skip translation to avoid breaking gradient flow
             if translation is not None and not translation.requires_grad:
                 translation = None
+            self.last_effective_pose = (rotation, translation)
             fwd_end_before = fwd_end.detach().clone() if logger.isEnabledFor(logging.INFO) else None
             bwd_end_before = bwd_end.detach().clone() if logger.isEnabledFor(logging.INFO) else None
             fwd_end = self._apply_encoder_pose(fwd_end, rotation, translation)

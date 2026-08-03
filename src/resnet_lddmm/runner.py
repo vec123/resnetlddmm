@@ -140,6 +140,40 @@ def seed_everything(seed):
     return key
 
 
+def _build_loss_terms(loss_cfg):
+    """cfg.loss.terms -> (composer entries, {name: term module}).
+
+    Zero-weight entries are dropped rather than computed and multiplied by zero,
+    matching how isometry has always been skipped when disabled.
+
+    Args:
+        loss_cfg: LossCfg with a .terms list of {kind, weight, name, kwargs} dicts
+
+    Returns:
+        (list of LossTerm, dict mapping metric name -> instantiated term)
+
+    Raises:
+        ValueError: on a missing 'kind', or a name colliding with another term
+    """
+    entries, modules = [], {}
+    for spec in loss_cfg.terms:
+        if "kind" not in spec:
+            raise ValueError(f"loss term needs a 'kind': {spec}")
+        name = spec.get("name", spec["kind"])
+        if name in modules:
+            raise ValueError(
+                f"duplicate loss term name {name!r}; give one of them an explicit "
+                f"'name' so their metrics stay distinguishable"
+            )
+        weight = float(spec.get("weight", 1.0))
+        if weight == 0:
+            continue
+        # Registry.create raises with the list of valid names on an unknown kind.
+        modules[name] = Registry.create("loss_term", spec["kind"], **spec.get("kwargs", {}))
+        entries.append(LossTerm(name, weight=weight))
+    return entries, modules
+
+
 def build(cfg: ExperimentCfg):
     """Assemble all components from config: the ONLY place Registry.create is called.
 
@@ -203,6 +237,36 @@ def build(cfg: ExperimentCfg):
             activation=cfg.field.activation,
             conditioning=conditioning
         )
+    elif cfg.field.kind == "equivariant_stationary":
+        field = Registry.create(
+            "field", "equivariant_stationary",
+            hidden_irreps=cfg.field.hidden_irreps,
+            gate_hidden_dim=cfg.field.gate_hidden_dim,
+            use_tensor_product_self=cfg.field.use_tensor_product_self,
+            layers_cfg=cfg.field.layers,
+            conditioning=conditioning
+        )
+    elif cfg.field.kind == "equivariant_contextual":
+        field = Registry.create(
+            "field", "equivariant_contextual",
+            context_irreps=cfg.field.context_irreps if hasattr(cfg.field, 'context_irreps') else "32x0e + 16x1o",
+            sh_lmax=cfg.field.sh_lmax if hasattr(cfg.field, 'sh_lmax') else 2,
+            layers_cfg=cfg.field.layers,
+            conditioning=conditioning
+        )
+    elif cfg.field.kind == "equivariant_contextual_simple":
+        field = Registry.create(
+            "field", "equivariant_contextual_simple",
+            hidden_dim=getattr(cfg.field, 'hidden_dim', 128),
+            n_layers=getattr(cfg.field, 'n_layers', 3),
+            conditioning=conditioning
+        )
+    elif cfg.field.kind == "equivariant_template":
+        field = Registry.create(
+            "field", "equivariant_template",
+            layers_cfg=cfg.field.layers,
+            conditioning=conditioning
+        )
     else:
         field = Registry.create(
             "field", cfg.field.kind,
@@ -237,13 +301,16 @@ def build(cfg: ExperimentCfg):
         sample_points=cfg.loss.isometry_samples
     ) if cfg.loss.isometry_weight > 0 else None
 
-    # Build loss composer (shared)
+    # Build loss composer (shared). data/kinetic/code_reg/isometry are produced by
+    # the mapping error and code source; cfg.loss.terms adds anything else.
     data_weight = 1.0 / (2 * cfg.loss.sigma**2)
+    extra_terms, loss_terms = _build_loss_terms(cfg.loss)
     terms = [
         LossTerm("data", weight=data_weight),
         LossTerm("kinetic", weight=cfg.loss.kinetic_weight),
         LossTerm("code_reg", weight=cfg.loss.code_reg_weight),
         LossTerm("isometry", weight=cfg.loss.isometry_weight),
+        *extra_terms,
     ]
     composer = LossComposer(terms)
 
@@ -262,9 +329,9 @@ def build(cfg: ExperimentCfg):
 
     # Branch on training mode (mapping_error created after loading shapes)
     if cfg.train.mode == "cohort":
-        return _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose)
+        return _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose, loss_terms)
     else:
-        return _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose)
+        return _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose, loss_terms)
 
 
 def _build_code_source(kind, code_cfg):
@@ -312,7 +379,7 @@ def _build_code_source_cohort(num_shapes, kind, code_cfg):
         return Registry.create("code", kind)
 
 
-def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False):
+def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False, loss_terms=None):
     """Build PairRegistration stepper."""
     # Load and normalize shapes
     source_shape = load_shape(cfg.source)
@@ -343,7 +410,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_enco
     optimizer = torch.optim.Adam(flow.parameters(), lr=cfg.train.lr, weight_decay=cfg.loss.weight_decay)
 
     # Create stepper
-    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose)
+    stepper = PairRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose, loss_terms=loss_terms)
 
     # Dump config to output dir
     _dump_config(cfg, "pair")
@@ -351,7 +418,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_enco
     return stepper, loader, transform
 
 
-def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False):
+def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_encoder_pose=False, loss_terms=None):
     """Build CohortRegistration stepper."""
     # Load all cohort shapes from directory
     cohort_paths = sorted(glob.glob(os.path.join(cfg.source, "*.obj"))) + \
@@ -388,7 +455,7 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_en
     ], lr=cfg.train.lr)
 
     # Create stepper
-    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose)
+    stepper = CohortRegistration(flow, code_source, data_term, mapping_error, composer, optimizer, iso_loss=iso_loss, augmentation=augmentation, use_encoder_pose=use_encoder_pose, loss_terms=loss_terms)
 
     # Dump config to output dir
     _dump_config(cfg, "cohort")

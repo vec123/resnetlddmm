@@ -1,18 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dataclass_field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 
 
 @dataclass
 class FieldCfg:
-    kind: str = "time_varying"              # time_varying | stationary
+    kind: str = "time_varying"              # time_varying | stationary | equivariant_stationary
     num_steps: int = 10                     # K — configured in ONE place
-    width: int = 512                        # block width (ignored by stationary)
+    width: int = 512                        # block width (ignored by stationary/equivariant_stationary)
     activation: str = "relu"
     fa: tuple = (64, 64, 64)                # stationary: FA-NN layer widths
     df: tuple = (256, 256, 256, 256, 256)   # DF-NN layer widths
     fourier_n_e: int = 3
+    # Equivariant stationary field (only if kind == "equivariant_stationary")
+    hidden_irreps: str = "4x0e + 2x1o"      # intermediate irreps representation (single-layer fallback)
+    gate_hidden_dim: int = 64               # hidden dim for gating network in SelfInteraction
+    use_tensor_product_self: bool = True    # use SelfInteraction (V⊗V+gating) vs simple Linear
+    layers: Optional[List[dict]] = dataclass_field(default=None)  # layer stack config for depth
+    # Equivariant contextual field (only if kind == "equivariant_contextual")
+    context_irreps: str = "32x0e + 16x1o"   # features after message passing aggregation
+    sh_lmax: int = 2                        # spherical harmonics lmax for bipartite convolution
+    # Simple equivariant contextual field (only if kind == "equivariant_contextual_simple")
+    hidden_dim: int = 128                   # hidden dimension in MLP layers
+    n_layers: int = 3                       # number of MLP layers
 
 
 @dataclass
@@ -43,6 +54,10 @@ class LossCfg:
     isometry_samples: int = 64              # points per step for isometry (64 = ~5x speedup)
     subsample_M: float = 2000               # subsample source to N points before flow. int (absolute) or 0<x<1 (fraction); 0 = disabled
     save_full: bool = False                 # when subsampling: also compute and export full trajectory
+    # Open-ended extra terms, resolved through the "loss_term" Registry category.
+    # Each entry: {kind: <registry name>, weight: float, name: <metric key>, kwargs: {}}
+    # Adding a loss is an entry here plus a registry line -- never a stepper edit.
+    terms: List[dict] = dataclass_field(default_factory=list)
 
     def resolve_subsample_count(self, n_source: int) -> int:
         """Resolve subsample_M to absolute point count given source size.
