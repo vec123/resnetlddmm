@@ -5,7 +5,7 @@ import torch
 from types import SimpleNamespace
 
 from src.resnet_lddmm.losses.mapping_error import UnidirectionalMappingError
-from src.resnet_lddmm.losses.terms import LossContext, FlowEquivarianceTerm, apply_pose
+from src.resnet_lddmm.losses.terms import LossContext, EquivariantDeformationLoss, apply_pose
 from src.resnet_lddmm.losses.data_terms import L2Data
 from src.resnet_lddmm.fields.time_varying import TimeVaryingField
 from src.resnet_lddmm.flow import NeuralODEFlow, IdentityFlowWrapper
@@ -53,21 +53,21 @@ def _context(flow, points, rotation, translation=None):
     )
 
 
-class TestFlowEquivarianceTerm:
+class TestEquivariantDeformationLoss:
     """L2 between φ(g·T) and g·φ(T)."""
 
     def test_none_without_pose(self):
         """No group element means nothing to be equivariant to -- skipped, not zero."""
         flow = _flow()
         points = torch.randn(1, 20, 3)
-        assert FlowEquivarianceTerm()(_context(flow, points, None, None)) is None
+        assert EquivariantDeformationLoss()(_context(flow, points, None, None)) is None
 
     def test_zero_under_identity_flow(self):
         """Identity commutes with everything, so pose-only training scores exactly 0."""
         flow = IdentityFlowWrapper(_flow())
         points = torch.randn(1, 20, 3)
 
-        value = FlowEquivarianceTerm()(_context(flow, points, _rotation(0.7)))
+        value = EquivariantDeformationLoss()(_context(flow, points, _rotation(0.7)))
 
         assert value.item() == pytest.approx(0.0, abs=1e-12)
 
@@ -86,14 +86,14 @@ class TestFlowEquivarianceTerm:
                              direct=ForwardEuler(), inverse=ModifiedEuler(), num_steps=3)
         points = torch.randn(1, 20, 3)
 
-        value = FlowEquivarianceTerm()(_context(flow, points, _rotation(0.7)))
+        value = EquivariantDeformationLoss()(_context(flow, points, _rotation(0.7)))
 
         assert value.item() == pytest.approx(0.0, abs=1e-10)
 
     def test_zero_for_an_untrained_field(self):
         """Zero-init output projection => identity flow => trivially equivariant."""
         torch.manual_seed(0)
-        value = FlowEquivarianceTerm()(_context(_flow(), torch.randn(1, 64, 3), _rotation(1.1)))
+        value = EquivariantDeformationLoss()(_context(_flow(), torch.randn(1, 64, 3), _rotation(1.1)))
         assert value.item() == pytest.approx(0.0, abs=1e-12)
 
     def test_positive_for_a_non_equivariant_field(self):
@@ -102,7 +102,7 @@ class TestFlowEquivarianceTerm:
         flow = _flow(active=True)
         points = torch.randn(1, 64, 3)
 
-        value = FlowEquivarianceTerm()(_context(flow, points, _rotation(1.1)))
+        value = EquivariantDeformationLoss()(_context(flow, points, _rotation(1.1)))
 
         assert value.item() > 0
 
@@ -113,12 +113,12 @@ class TestFlowEquivarianceTerm:
         points = torch.randn(1, 32, 3)
         rotation = _rotation(0.9).requires_grad_(True)
 
-        FlowEquivarianceTerm(detach_group=True)(_context(flow, points, rotation)).backward()
+        EquivariantDeformationLoss(detach_group=True)(_context(flow, points, rotation)).backward()
         assert rotation.grad is None
         assert any(p.grad is not None for p in flow.field.parameters())
 
         rotation2 = _rotation(0.9).requires_grad_(True)
-        FlowEquivarianceTerm(detach_group=False)(_context(flow, points, rotation2)).backward()
+        EquivariantDeformationLoss(detach_group=False)(_context(flow, points, rotation2)).backward()
         assert rotation2.grad is not None
 
     def test_translation_can_be_excluded(self):
@@ -128,8 +128,8 @@ class TestFlowEquivarianceTerm:
         points = torch.randn(1, 32, 3)
         t = torch.tensor([[0.3, -0.2, 0.1]])
 
-        with_t = FlowEquivarianceTerm(translation=True)(_context(flow, points, None, t))
-        without_t = FlowEquivarianceTerm(translation=False)(_context(flow, points, None, t))
+        with_t = EquivariantDeformationLoss(translation=True)(_context(flow, points, None, t))
+        without_t = EquivariantDeformationLoss(translation=False)(_context(flow, points, None, t))
 
         assert with_t.item() > 0
         assert without_t is None  # rotation None + translation excluded -> nothing to test
@@ -155,7 +155,7 @@ class TestFlowEquivarianceTerm:
                           template_points=error.last_template_points,
                           fwd_traj=error.last_fwd_traj,
                           encoder_pose=error.last_effective_pose)
-        assert FlowEquivarianceTerm()(ctx).item() == pytest.approx(0.0, abs=1e-12)
+        assert EquivariantDeformationLoss()(ctx).item() == pytest.approx(0.0, abs=1e-12)
 
 
 class TestApplyPose:
@@ -180,28 +180,61 @@ class TestLossTermWiring:
     """cfg.loss.terms -> composer entries + stepper-visible modules."""
 
     def test_registry_resolves_the_term(self):
-        term = Registry.create("loss_term", "flow_equivariance", detach_group=False)
-        assert isinstance(term, FlowEquivarianceTerm)
+        term = Registry.create("loss_term", "equivariant_deformation_loss", detach_group=False)
+        assert isinstance(term, EquivariantDeformationLoss)
         assert term.detach_group is False
 
     def test_build_loss_terms(self):
         from src.resnet_lddmm.runner import _build_loss_terms
 
         cfg = SimpleNamespace(terms=[
-            {"kind": "flow_equivariance", "weight": 2.5, "kwargs": {"detach_group": False}},
-            {"kind": "flow_equivariance", "name": "equiv_so3", "weight": 1.0,
+            {"kind": "equivariant_deformation_loss", "weight": 2.5, "kwargs": {"detach_group": False}},
+            {"kind": "equivariant_deformation_loss", "name": "equiv_so3", "weight": 1.0,
              "kwargs": {"translation": False}},
-            {"kind": "flow_equivariance", "name": "disabled", "weight": 0.0},
+            {"kind": "equivariant_deformation_loss", "name": "disabled", "weight": 0.0},
         ])
         entries, modules = _build_loss_terms(cfg)
 
-        assert [e.name for e in entries] == ["flow_equivariance", "equiv_so3"]
+        assert [e.name for e in entries] == ["equivariant_deformation_loss", "equiv_so3"]
         assert [e.weight for e in entries] == [2.5, 1.0]
-        assert set(modules) == {"flow_equivariance", "equiv_so3"}   # weight 0 dropped
-        assert modules["flow_equivariance"].detach_group is False
+        assert set(modules) == {"equivariant_deformation_loss", "equiv_so3"}   # weight 0 dropped
+        assert modules["equivariant_deformation_loss"].detach_group is False
         assert modules["equiv_so3"].translation is False
 
     def test_empty_terms_is_inert(self):
+        from src.resnet_lddmm.runner import _build_loss_terms
+
+        assert _build_loss_terms(SimpleNamespace(terms=[])) == ([], {})
+
+    def test_weight_gates_the_equivariant_deformation_loss(self):
+        """weight > 0 builds it; 0 means it is never instantiated at all.
+
+        Not "computed then scaled by zero": at 0 the term does not exist, so its
+        extra forward integration never runs and it stays out of the breakdown.
+        """
+        from src.resnet_lddmm.runner import _build_loss_terms
+
+        off = SimpleNamespace(terms=[], equivariant_deformation_weight=0.0,
+                              equivariant_deformation_kwargs={})
+        assert _build_loss_terms(off) == ([], {})
+
+        on = SimpleNamespace(terms=[], equivariant_deformation_weight=0.25,
+                             equivariant_deformation_kwargs={"detach_group": False})
+        entries, modules = _build_loss_terms(on)
+
+        assert [e.name for e in entries] == ["equivariant_deformation_loss"]
+        assert entries[0].weight == 0.25
+        assert modules["equivariant_deformation_loss"].detach_group is False
+
+    def test_negative_weight_also_gates(self):
+        from src.resnet_lddmm.runner import _build_loss_terms
+
+        cfg = SimpleNamespace(terms=[], equivariant_deformation_weight=-1.0,
+                              equivariant_deformation_kwargs={})
+        assert _build_loss_terms(cfg) == ([], {})
+
+    def test_weight_absent_from_config_is_inert(self):
+        """A LossCfg without the field at all (older configs) still builds."""
         from src.resnet_lddmm.runner import _build_loss_terms
 
         assert _build_loss_terms(SimpleNamespace(terms=[])) == ([], {})
@@ -210,15 +243,15 @@ class TestLossTermWiring:
         from src.resnet_lddmm.runner import _build_loss_terms
 
         cfg = SimpleNamespace(terms=[{"kind": "nope", "weight": 1.0}])
-        with pytest.raises(ValueError, match="flow_equivariance"):
+        with pytest.raises(ValueError, match="equivariant_deformation_loss"):
             _build_loss_terms(cfg)
 
     def test_duplicate_names_rejected(self):
         from src.resnet_lddmm.runner import _build_loss_terms
 
         cfg = SimpleNamespace(terms=[
-            {"kind": "flow_equivariance", "weight": 1.0},
-            {"kind": "flow_equivariance", "weight": 2.0},
+            {"kind": "equivariant_deformation_loss", "weight": 1.0},
+            {"kind": "equivariant_deformation_loss", "weight": 2.0},
         ])
         with pytest.raises(ValueError, match="duplicate loss term name"):
             _build_loss_terms(cfg)
@@ -234,7 +267,7 @@ class TestLossTermWiring:
         torch.manual_seed(0)
         flow = _flow(active=True)
         composer = LossComposer([LossTerm("data", 1.0), LossTerm("kinetic", 0.0),
-                                 LossTerm("flow_equivariance", 1.0)])
+                                 LossTerm("equivariant_deformation_loss", 1.0)])
         code_source = SimpleNamespace(
             __call__=lambda batch: None, penalty=lambda: None,
             get_pose=lambda: (_rotation(0.6), None),
@@ -243,14 +276,14 @@ class TestLossTermWiring:
             flow, _StubCode(), L2Data(), UnidirectionalMappingError(), composer,
             torch.optim.Adam(flow.parameters(), lr=1e-4),
             use_encoder_pose=True,
-            loss_terms={"flow_equivariance": FlowEquivarianceTerm()},
+            loss_terms={"equivariant_deformation_loss": EquivariantDeformationLoss()},
         )
         batch = SimpleNamespace(points=torch.randn(1, 20, 3), weights=None, faces=None)
 
         _, _, breakdown = stepper.train_step(batch, batch)
 
-        assert "flow_equivariance" in breakdown
-        assert breakdown["flow_equivariance"] > 0
+        assert "equivariant_deformation_loss" in breakdown
+        assert breakdown["equivariant_deformation_loss"] > 0
 
 
 class _StubCode(torch.nn.Module):

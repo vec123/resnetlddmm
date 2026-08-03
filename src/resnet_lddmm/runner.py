@@ -155,8 +155,22 @@ def _build_loss_terms(loss_cfg):
     Raises:
         ValueError: on a missing 'kind', or a name colliding with another term
     """
+    specs = list(loss_cfg.terms)
+
+    # First-class weight for the equivariant deformation loss, configured like
+    # every other term (isometry_weight, kinetic_weight, ...). Strictly > 0 to be
+    # built at all: at 0 the term is never instantiated and its extra forward
+    # integration never runs, rather than being computed and multiplied by zero.
+    equiv_weight = float(getattr(loss_cfg, "equivariant_deformation_weight", 0.0) or 0.0)
+    if equiv_weight > 0:
+        specs.append({
+            "kind": "equivariant_deformation_loss",
+            "weight": equiv_weight,
+            "kwargs": dict(getattr(loss_cfg, "equivariant_deformation_kwargs", None) or {}),
+        })
+
     entries, modules = [], {}
-    for spec in loss_cfg.terms:
+    for spec in specs:
         if "kind" not in spec:
             raise ValueError(f"loss term needs a 'kind': {spec}")
         name = spec.get("name", spec["kind"])
@@ -166,7 +180,7 @@ def _build_loss_terms(loss_cfg):
                 f"'name' so their metrics stay distinguishable"
             )
         weight = float(spec.get("weight", 1.0))
-        if weight == 0:
+        if weight <= 0:
             continue
         # Registry.create raises with the list of valid names on an unknown kind.
         modules[name] = Registry.create("loss_term", spec["kind"], **spec.get("kwargs", {}))

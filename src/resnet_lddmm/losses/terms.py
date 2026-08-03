@@ -73,8 +73,8 @@ def apply_pose(points: Tensor, rotation: Optional[Tensor],
     return points
 
 
-class FlowEquivarianceTerm(nn.Module):
-    """L2 between ``φ(g·T)`` and ``g·φ(T)``: the flow must commute with the pose.
+class EquivariantDeformationLoss(nn.Module):
+    """L2 between ``φ(g·T)`` and ``g·φ(T)``: the deformation must commute with the pose.
 
     The deformation of a posed template should equal the posed deformation of the
     template. Both sides descend from the SAME ``ctx.template_points`` and the
