@@ -52,6 +52,8 @@ class LossCfg:
     isometry_weight: float = 0.0            # disabled by default
     equivariant_deformation_weight: float = 0.0   # ||phi(g.T) - g.phi(T)||^2; 0 = not computed
     equivariant_deformation_kwargs: dict = dataclass_field(default_factory=dict)  # field_only, translation
+    pose_supervision_weight: float = 0.0          # ||R_hat - R_aug||_F^2 against the drawn element; 0 = not computed
+    pose_supervision_kwargs: dict = dataclass_field(default_factory=dict)        # translation
     isometry_type: str = "strain"           # or "det" / "orthogonal"
     isometry_samples: int = 64              # points per step for isometry (64 = ~5x speedup)
     subsample_M: float = 2000               # subsample source to N points before flow. int (absolute) or 0<x<1 (fraction); 0 = disabled

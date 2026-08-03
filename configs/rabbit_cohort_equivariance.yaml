@@ -101,10 +101,30 @@ loss:
     # term is trivially zero at g = identity, so it can then be minimised by driving R
     # toward I instead of by making the flow equivariant -- which fights the data term.
     field_only: true
+
     # Include the predicted translation in g. Currently INERT either way: the encoder
     # predicts a translation but with requires_grad=False, and mapping_error drops
     # non-grad translations. Goes live with SE(3) pose training.
     translation: false
+
+  # || R_hat - R_aug ||_F^2 against the rotation SO3Augmentation actually drew.
+  # The only genuinely SUPERVISED pose signal here: the target generated the encoder's
+  # input, so it needs no correspondence, cannot be gamed, and does not depend on the
+  # flow being any good -- which is what lets the pose head and the field train at the
+  # same time instead of waiting on each other. Chamfer, by contrast, reaches the pose
+  # head through a nearest-neighbour assignment that flips as R turns, which is the
+  # bumpy landscape that traps R_hat.
+  # Only available because the pose is SYNTHETIC; it teaches the encoder to undo the
+  # augmenter, not to handle real pose variation in held-out data.
+  # Scale note: this term is O(1) (see the reference values below) while the data term
+  # carries the 1/(2*sigma^2) = 500000 factor, so at weight 1.0 it contributes ~5 out of
+  # ~860000 and cannot influence anything. 1e5 makes the two comparable. The cleaner fix
+  # is a sane data scale -- sigma: 0.05 gives weight 200, after which ~50 suffices here.
+  # Reading the value: ||R_hat - R_aug||_F^2 = 8*sin^2(theta/2), so 0 = exact,
+  # 6 = chance for independent uniform rotations, 8 = maximally wrong (180 degrees).
+  pose_supervision_weight: 100000.0
+  pose_supervision_kwargs:
+    translation: false                 # SO(3) augmentation draws none; see above
 
 train:
   mode: cohort

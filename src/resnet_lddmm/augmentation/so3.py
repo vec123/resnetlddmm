@@ -89,6 +89,9 @@ class SO3Augmentation(Augmentation):
         # Zero translations (rotation only)
         translations = torch.zeros(batch_size, 3, device=device, dtype=dtype)
 
+        # Record the drawn element so a supervision term can target it
+        self._record_element(rotations, None)
+
         # Flatten points: [B*N, 3]
         flat_points = points.reshape(-1, 3)
 

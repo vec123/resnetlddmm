@@ -5,7 +5,9 @@ import torch
 from types import SimpleNamespace
 
 from src.resnet_lddmm.losses.mapping_error import UnidirectionalMappingError
-from src.resnet_lddmm.losses.terms import LossContext, EquivariantDeformationLoss, apply_pose
+from src.resnet_lddmm.losses.terms import (
+    LossContext, EquivariantDeformationLoss, PoseSupervisionLoss, apply_pose,
+)
 from src.resnet_lddmm.losses.data_terms import L2Data
 from src.resnet_lddmm.fields.time_varying import TimeVaryingField
 from src.resnet_lddmm.flow import NeuralODEFlow, IdentityFlowWrapper
@@ -337,3 +339,114 @@ class _StubCode(torch.nn.Module):
 
     def get_pose(self):
         return self.rotation, None
+
+
+class TestAugmentationRecordsItsElement:
+    """Augmentations expose the group element they drew, for supervision."""
+
+    def test_so3_records_rotation(self):
+        from src.resnet_lddmm.augmentation.so3 import SO3Augmentation
+
+        aug = SO3Augmentation(seed=0)
+        points = torch.randn(3, 20, 3)
+        out = aug(points)
+
+        R, t = aug.last_element()
+        assert R.shape == (3, 3, 3)
+        assert t is None
+        # The recorded element is exactly what was applied, in the pipeline's convention.
+        assert torch.allclose(apply_pose(points, R, None), out, atol=1e-5)
+
+    def test_se3_records_rotation_and_translation(self):
+        from src.resnet_lddmm.augmentation.se3 import SE3Augmentation
+
+        aug = SE3Augmentation(translation_scale=0.3, seed=0)
+        points = torch.randn(2, 20, 3)
+        out = aug(points)
+
+        R, t = aug.last_element()
+        assert R.shape == (2, 3, 3) and t.shape == (2, 3)
+        assert torch.allclose(apply_pose(points, R, t), out, atol=1e-5)
+
+    def test_none_records_nothing(self):
+        from src.resnet_lddmm.augmentation.none import NoAugmentation
+
+        aug = NoAugmentation()
+        aug(torch.randn(2, 10, 3))
+        assert aug.last_element() == (None, None)
+
+    def test_element_refreshes_each_call(self):
+        from src.resnet_lddmm.augmentation.so3 import SO3Augmentation
+
+        aug = SO3Augmentation(seed=0)
+        points = torch.randn(2, 10, 3)
+        aug(points); first = aug.last_element()[0].clone()
+        aug(points); second = aug.last_element()[0]
+
+        assert not torch.allclose(first, second)
+
+
+class TestPoseSupervisionLoss:
+    """Supervising R̂ against the rotation the augmenter actually drew."""
+
+    @staticmethod
+    def _ctx(pred_R, true_R, pred_t=None, true_t=None):
+        return LossContext(encoder_pose=(pred_R, pred_t), augmentation_pose=(true_R, true_t))
+
+    def test_zero_when_prediction_matches(self):
+        R = _rotation(0.7)
+        assert PoseSupervisionLoss()(self._ctx(R, R.clone())).item() == pytest.approx(0.0, abs=1e-12)
+
+    def test_positive_when_prediction_is_wrong(self):
+        assert PoseSupervisionLoss()(self._ctx(_rotation(0.7), _rotation(-0.9))).item() > 0.1
+
+    def test_none_without_a_predicted_rotation(self):
+        assert PoseSupervisionLoss()(self._ctx(None, _rotation(0.5))) is None
+
+    def test_none_without_an_augmentation(self):
+        """kind: none draws no element, so the term vanishes rather than erroring."""
+        assert PoseSupervisionLoss()(self._ctx(_rotation(0.5), None)) is None
+
+    def test_gradient_reaches_the_prediction_only(self):
+        pred = _rotation(-0.4).requires_grad_(True)
+        true = _rotation(0.7).requires_grad_(True)
+
+        PoseSupervisionLoss()(self._ctx(pred, true)).backward()
+
+        assert pred.grad is not None
+        assert true.grad is None      # the target is data, never a variable
+
+    def test_translation_off_by_default(self):
+        """Rotation-only unless asked, since SO(3) augmentation has no translation."""
+        R = _rotation(0.5)
+        ctx = self._ctx(R, R.clone(), pred_t=torch.zeros(1, 3), true_t=torch.ones(1, 3))
+
+        assert PoseSupervisionLoss(translation=False)(ctx).item() == pytest.approx(0.0, abs=1e-12)
+        assert PoseSupervisionLoss(translation=True)(ctx).item() == pytest.approx(3.0, rel=1e-5)
+
+    def test_descends_to_the_true_rotation(self):
+        """Plain SGD on this term drives R̂ onto the drawn rotation."""
+        true = _rotation(0.9)
+        pred = _rotation(-0.5).clone().requires_grad_(True)
+        opt = torch.optim.SGD([pred], lr=0.2)
+
+        for _ in range(60):
+            opt.zero_grad()
+            PoseSupervisionLoss()(self._ctx(pred, true)).backward()
+            opt.step()
+
+        assert (pred.detach() - true).abs().max() < 0.02
+
+    def test_registry_and_gating(self):
+        from src.resnet_lddmm.runner import _build_loss_terms
+
+        term = Registry.create("loss_term", "pose_supervision_loss", translation=True)
+        assert isinstance(term, PoseSupervisionLoss) and term.translation is True
+
+        off = SimpleNamespace(terms=[], pose_supervision_weight=0.0, pose_supervision_kwargs={})
+        assert _build_loss_terms(off) == ([], {})
+
+        on = SimpleNamespace(terms=[], pose_supervision_weight=3.0, pose_supervision_kwargs={})
+        entries, modules = _build_loss_terms(on)
+        assert [e.name for e in entries] == ["pose_supervision_loss"]
+        assert entries[0].weight == 3.0

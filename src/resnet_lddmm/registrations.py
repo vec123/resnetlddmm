@@ -61,6 +61,7 @@ Registry.register("iso_loss", "isometry", "src.resnet_lddmm.losses.data_terms:Is
 # Config-selected loss terms (loss.terms in the YAML). Each takes a LossContext
 # and returns a scalar or None; see losses/terms.py.
 Registry.register("loss_term", "equivariant_deformation_loss", "src.resnet_lddmm.losses.terms:EquivariantDeformationLoss")
+Registry.register("loss_term", "pose_supervision_loss", "src.resnet_lddmm.losses.terms:PoseSupervisionLoss")
 
 # Augmentation: random group transformations (SE(3), SO(3), or none)
 Registry.register("augmentation", "none", "src.resnet_lddmm.augmentation.none:NoAugmentation")

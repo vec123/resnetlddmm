@@ -115,6 +115,7 @@ class CohortRegistration:
                 bwd_traj=self.backward_traj,
                 pred=None,
                 encoder_pose=self.mapping_error.last_effective_pose,
+                augmentation_pose=self.augmentation.last_element(),
                 data_term=self.data_term,
                 code_source=self.code_source,
                 template=template,

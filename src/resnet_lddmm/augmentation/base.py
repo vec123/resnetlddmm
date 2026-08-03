@@ -21,6 +21,13 @@ class Augmentation(nn.Module, abc.ABC):
     - Gradients flow: loss → augmented_points → transformation → flow params
     """
 
+    def __init__(self):
+        super().__init__()
+        # The group element drawn by the most recent forward, recorded so a loss
+        # term can supervise a predicted pose against the transform that actually
+        # produced the input. (None, None) for augmentations that draw nothing.
+        self._last_element = (None, None)
+
     @abc.abstractmethod
     def forward(self, points: Tensor) -> Tensor:
         """Apply augmentation to source point cloud batch.
@@ -34,4 +41,26 @@ class Augmentation(nn.Module, abc.ABC):
         Invariant:
             Output shape matches input shape exactly.
             Gradients flow from output back through transformation to input.
+            Subclasses that sample a group element record it via _record_element.
         """
+
+    def _record_element(self, rotation, translation) -> None:
+        """Store the group element this forward drew, for supervision terms.
+
+        Args:
+            rotation: [B, 3, 3] or None
+            translation: [B, 3] or None
+        """
+        self._last_element = (rotation, translation)
+
+    def last_element(self):
+        """The group element applied by the most recent forward.
+
+        This is ground truth in the strict sense — the transform that generated
+        the network's input — so a term comparing a predicted pose against it is
+        supervised, not self-referential.
+
+        Returns:
+            (rotation [B,3,3] or None, translation [B,3] or None)
+        """
+        return self._last_element

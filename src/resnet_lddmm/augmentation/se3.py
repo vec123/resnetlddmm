@@ -95,6 +95,9 @@ class SE3Augmentation(Augmentation):
         rotations = self._sample_random_rotations(batch_size, device, dtype)  # [B, 3, 3]
         translations = self._sample_random_translations(batch_size, device, dtype)  # [B, 3]
 
+        # Record the drawn element so a supervision term can target it
+        self._record_element(rotations, translations)
+
         # Flatten points: [B*N, 3]
         flat_points = points.reshape(-1, 3)
 

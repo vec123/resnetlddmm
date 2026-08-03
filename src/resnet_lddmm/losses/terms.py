@@ -39,6 +39,7 @@ class LossContext:
     bwd_traj: Any = None                               # Trajectory, bidirectional only
     pred: Optional[Tensor] = None                      # posed endpoint the data term saw
     encoder_pose: Tuple[Optional[Tensor], Optional[Tensor]] = (None, None)
+    augmentation_pose: Tuple[Optional[Tensor], Optional[Tensor]] = (None, None)  # ground truth
     data_term: Any = None                              # configured DataTerm, reusable
     code_source: Any = None
     template: Any = None                               # unsubsampled batch (faces, weights)
@@ -72,6 +73,73 @@ def apply_pose(points: Tensor, rotation: Optional[Tensor],
     if translation is not None:
         points = points + translation.unsqueeze(1)
     return points
+
+
+class PoseSupervisionLoss(nn.Module):
+    """Supervise the predicted pose against the group element the augmenter drew.
+
+    ``SO3Augmentation`` samples the rotation that produces the encoder's input, so
+    that rotation IS the answer the pose head should give: the pipeline compares
+    ``φ(T)·R̂`` against ``S·R_aug``, which agrees exactly when ``R̂ = R_aug``.
+
+    This is the only pose signal here that is genuinely supervised. It needs no
+    vertex correspondence, cannot be satisfied by collapsing anything, and does not
+    depend on the flow being any good — which is what lets the pose head and the
+    field train at the same time instead of waiting on each other. Chamfer, by
+    contrast, reaches the pose head through a nearest-neighbour assignment that
+    flips as the rotation turns, giving the bumpy landscape that traps R̂.
+
+    Chordal distance ``‖R̂ − R_aug‖_F²`` rather than the geodesic angle: monotone in
+    that angle, but smooth everywhere, whereas ``arccos`` blows up at 0 and π.
+
+    Returns None whenever there is nothing to compare — no predicted rotation, or an
+    augmentation that draws no element (``kind: none``), so the term simply vanishes
+    from the breakdown instead of erroring.
+
+    Note this supervision exists only because the pose is SYNTHETIC. It teaches the
+    encoder to undo the augmenter's rotations; it is not available for real pose
+    variation in held-out data.
+    """
+
+    def __init__(self, translation: bool = False):
+        """Initialize pose supervision.
+
+        Args:
+            translation: also supervise the predicted translation against the drawn
+                one. Off by default: with SO(3) augmentation there is no translation
+                to recover, and the encoder's translation currently arrives with
+                requires_grad=False, so supervising it would contribute no gradient.
+        """
+        super().__init__()
+        self.translation = translation
+
+    def forward(self, ctx: LossContext) -> Optional[Tensor]:
+        """Compute ‖R̂ − R_aug‖_F² (plus the translation term if enabled).
+
+        Args:
+            ctx: the step's LossContext
+
+        Returns:
+            Scalar tensor, or None when either pose is unavailable
+        """
+        pred_rotation, pred_translation = ctx.encoder_pose
+        true_rotation, true_translation = ctx.augmentation_pose
+
+        terms = []
+        if pred_rotation is not None and true_rotation is not None:
+            # The target generated the input; it is data, never a variable.
+            terms.append(
+                (pred_rotation - true_rotation.detach()).pow(2).sum(dim=(-2, -1)).mean()
+            )
+
+        if self.translation and pred_translation is not None and true_translation is not None:
+            terms.append(
+                (pred_translation - true_translation.detach()).pow(2).sum(dim=-1).mean()
+            )
+
+        if not terms:
+            return None
+        return sum(terms)
 
 
 class EquivariantDeformationLoss(nn.Module):

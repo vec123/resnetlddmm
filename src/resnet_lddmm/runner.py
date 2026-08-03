@@ -161,7 +161,7 @@ def _build_loss_terms(loss_cfg):
     # kinetic_weight, ...). Strictly > 0 to be built at all: at 0 the term is never
     # instantiated and its extra work never runs, rather than being computed and
     # multiplied by zero. A new gated term is one entry here.
-    for kind in ("equivariant_deformation",):
+    for kind in ("equivariant_deformation", "pose_supervision"):
         weight = float(getattr(loss_cfg, f"{kind}_weight", 0.0) or 0.0)
         if weight > 0:
             specs.append({
