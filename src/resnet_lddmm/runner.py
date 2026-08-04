@@ -80,6 +80,8 @@ def _build_encoder_code_source(encoder_config, graph_spec, n_z):
         supernode_sh_lmax=encoder_config.supernode_sh_lmax,
         transformer_type=encoder_config.transformer_type,
         transformer_cfg=encoder_config.transformer_cfg,
+        supernode_samples=encoder_config.supernode_samples,
+        supernode_seed=encoder_config.supernode_seed,
         area_pool=encoder_config.area_pool,
         latent_mode=encoder_config.latent_mode,
         verbose=encoder_config.verbose,

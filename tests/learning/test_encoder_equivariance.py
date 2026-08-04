@@ -158,3 +158,84 @@ def _run_all():
 
 if __name__ == '__main__':
     _run_all()
+
+
+# --------------------------------------------------------------------------- #
+# Supernode path
+#
+# Every test above passes ``supergraph=None``, which leaves ``supernode_conv`` as dead
+# weights -- so none of them exercised the Monte-Carlo neighbour sampler that the real
+# pipeline (use_supernodes=True) runs through. That gap hid a ~15%-of-scale invariance
+# break. These build the graph with the PRODUCTION builder so the sampler is live.
+# --------------------------------------------------------------------------- #
+def make_supergraph_pair(R, t, seed=0, n_points=40, r_supergraph=2.0, n_supernodes=5):
+    """(graph, supergraph) for a cloud and its SE(3) image, via the production builder."""
+    from src.learning.data.builders import RadiusGraphBuilder
+    from src.spec import GraphSpec
+
+    torch.manual_seed(seed)
+    points = torch.randn(1, n_points, 3)
+    spec = GraphSpec(r_max=1.2, r_supergraph=r_supergraph, dropout_rate=0.0,
+                     n_supernodes=n_supernodes,
+                     use_supernodes=True, sampling_mode_graph='uniform',
+                     sampling_mode_supernodes='fps', recompute_area=True, area_k=4,
+                     noise_std=0.0)
+    builder = RadiusGraphBuilder(spec)
+    mask = torch.ones(points.shape[:2], dtype=torch.bool)
+
+    return builder.build(points, mask, None), builder.build(points @ R.T + t, mask, None)
+
+
+def test_supernode_latent_is_SE3_invariant():
+    """mu must be invariant on the path the pipeline actually uses."""
+    enc = make_encoder()
+    torch.manual_seed(3)
+    R, t = o3.rand_matrix(), torch.randn(3)
+    (g0, s0), (g1, s1) = make_supergraph_pair(R, t)
+
+    with torch.no_grad():
+        mu0 = enc(g0, s0).mu
+        mu1 = enc(g1, s1).mu
+
+    err = (mu0 - mu1).abs().max().item()
+    print(f"[invariance:supernodes] max |mu - mu(Rx+t)| = {err:.2e}")
+    assert torch.allclose(mu0, mu1, atol=1e-4), \
+        f"mu is NOT SE(3)-invariant through supernodes (max err {err:.2e})"
+
+
+def test_supernode_path_is_deterministic_without_monte_carlo():
+    """Same input twice, same answer -- otherwise train.seed cannot make runs reproducible."""
+    enc = make_encoder()
+    (g0, s0), _ = make_supergraph_pair(o3.rand_matrix(), torch.zeros(3))
+
+    with torch.no_grad():
+        a = enc(g0, s0).mu
+        b = enc(g0, s0).mu
+
+    assert torch.allclose(a, b, atol=1e-6), "supernode aggregation is not repeatable"
+
+
+def test_sampling_costs_exact_invariance():
+    """supernode_samples=int forfeits exact invariance -- documented, not accidental.
+
+    The sampler keys edges POSITIONALLY (interaction.py:274) and a radius graph emits the
+    same edge SET in a rotation-dependent ORDER, so even a pinned seed selects a different
+    subset once the input is rotated. Pinned here so the trade-off cannot silently return.
+    """
+    torch.manual_seed(0)
+    enc = make_encoder()
+    enc.supernode_samples, enc.supernode_seed = 8, 1   # sample; pinned draw
+    torch.manual_seed(4)
+    R, t = o3.rand_matrix(), torch.randn(3)
+    # Dense enough that supernode degree exceeds supernode_samples, so sampling FIRES.
+    (g0, s0), (g1, s1) = make_supergraph_pair(R, t, n_points=120, r_supergraph=6.0,
+                                              n_supernodes=3)
+    assert s0.edge_index.size(1) / 3 > 8, "graph too sparse to exercise the sampler"
+
+    with torch.no_grad():
+        mu0 = enc(g0, s0).mu
+        mu1 = enc(g1, s1).mu
+
+    err = (mu0 - mu1).abs().max().item()
+    print(f"[invariance:sampled] max |mu - mu(Rx+t)| = {err:.2e}")
+    assert err > 1e-4, "sampling unexpectedly exact -- has the sampler been changed?"

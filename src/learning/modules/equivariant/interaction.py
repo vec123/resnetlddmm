@@ -31,12 +31,13 @@ class GatingBlock(nn.Module):
 
 
 class SelfInteraction(nn.Module):
-    def __init__(self, in_irreps, target_irreps, sh_lmax = 1, verbose=True):
+    def __init__(self, in_irreps, target_irreps, sh_lmax=1, gate_hidden_dim=64, verbose=True):
         super().__init__()
         # self.in_irreps = o3.Irreps(in_irreps)
         self.in_irreps = self.limit_irreps(in_irreps, sh_lmax)
         self.target_irreps = o3.Irreps(target_irreps)
         self.sh_lmax = sh_lmax
+        self.gate_hidden_dim = gate_hidden_dim
         self.verbose = verbose
 
         # Tensor Product: V ⊗ V (equivariant self-interaction / "square").
@@ -52,9 +53,9 @@ class SelfInteraction(nn.Module):
         # MLP gating: one gate per irrep, computed from the invariant scalars.
         self.num_scalars = self.concat_irreps.count("0e")
         self.gate_mlp = nn.Sequential(
-            nn.Linear(self.num_scalars, 64),
+            nn.Linear(self.num_scalars, gate_hidden_dim),
             nn.SiLU(),
-            nn.Linear(64, self.concat_irreps.num_irreps)  # one gate per irrep
+            nn.Linear(gate_hidden_dim, self.concat_irreps.num_irreps)  # one gate per irrep
         )
 
         # Final Linear projection: (V ⊕ V⊗V) -> target.
@@ -310,11 +311,19 @@ class MonteCarloBipartiteSpatialConvolution(EquivariantSpatialConv):
         if seed is not None:
             gen = torch.Generator(device=edge_index.device).manual_seed(seed)
 
-        # Extract node areas and run our vectorized sampler
         area_node = self._node_area(area_src, num_source, x_src).view(-1)
-        sampled_edges, deg_target = _sample_neighbors(
-            edge_index, area_node, num_target, num_samples, gen
-        )
+        if num_samples is None:
+            # No sampling: aggregate over EVERY neighbour, which is what makes the
+            # result exactly SE(3)-invariant. Sampling cannot be, even with a fixed
+            # seed: _sample_neighbors draws u positionally over edge_index, and a
+            # radius graph emits the same edge SET in a rotation-dependent ORDER, so
+            # the same seed selects a different subset for a rotated input.
+            sampled_edges = torch.arange(edge_index.size(1), device=edge_index.device)
+            deg_target = degree(edge_index[0], num_nodes=num_target, dtype=x_src.dtype)
+        else:
+            sampled_edges, deg_target = _sample_neighbors(
+                edge_index, area_node, num_target, num_samples, gen
+            )
 
         sub_edge_index = edge_index[:, sampled_edges]
 

@@ -56,6 +56,11 @@ class EncoderConfig:
     supernode_sh_lmax: int = 4
     transformer_type: Optional[str] = "se3"   # "se3" | "equiformer" | None
     transformer_cfg: dict = field(default_factory=dict)
+    # Supernode neighbourhood aggregation. None = use every neighbour: exact,
+    # repeatable, and exactly SE(3)-invariant. An int enables Monte-Carlo sampling,
+    # which forfeits exact invariance even with a pinned seed. See GroupEncoder.
+    supernode_samples: Optional[int] = None
+    supernode_seed: Optional[int] = 1
     area_pool: bool = False
     latent_mode: str = "gaussian"  # "gaussian" | "deterministic"
     verbose: bool = False 

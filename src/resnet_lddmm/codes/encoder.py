@@ -27,6 +27,9 @@ class EncoderCodes(ShapeCode):
             graph_builder: GraphBuilder instance (from Registry.create)
             encoder: GroupEncoder instance (from Registry.create)
             n_z: latent dimension (optional, inferred from encoder if not provided)
+
+        Determinism and SE(3) invariance are the ENCODER's business, configured by
+        its supernode_samples/supernode_seed members -- nothing is overridden here.
         """
         super().__init__()
         self.graph_builder = graph_builder
