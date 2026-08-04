@@ -4,6 +4,22 @@ from dataclasses import dataclass, field as dataclass_field
 from typing import Optional, List, Any, Dict
 
 
+# Where joint_normalize places the shapes -- equivalently, where the ORIGIN sits
+# relative to them. Not cosmetic: SO3Augmentation and the encoder pose are both
+# applied as ``points @ R``, i.e. about the ORIGIN, so this decides whether a
+# rotation is a spin or an orbit.
+#
+#   "box"    [0,1]^3, centroid at (0.5,0.5,0.5), 0.87 from the origin. A rotation
+#            ORBITS the shape further than its own diameter, which gives chamfer a
+#            strong pose signal (measured: 64x contrast vs 9x). But a rotation-only
+#            pose can then only reach targets whose centroid stays on that sphere,
+#            so samples that arrive already rotated in place are NOT reachable.
+#   "origin" [-0.5,0.5]^3, centroid at the origin. A rotation is a spin in place, so
+#            pre-rotated samples are reachable and the pose head's translation (an
+#            absolute centroid) composes correctly. Weaker chamfer signal.
+CENTERING_DOMAINS = {"box": (0.0, 1.0), "origin": (-0.5, 0.5)}
+
+
 @dataclass
 class FieldCfg:
     kind: str = "time_varying"              # time_varying | stationary | equivariant_stationary
@@ -113,6 +129,7 @@ class ExperimentCfg:
     loss: LossCfg = dataclass_field(default_factory=LossCfg)
     augmentation: AugmentationCfg = dataclass_field(default_factory=AugmentationCfg)
     train: TrainCfg = dataclass_field(default_factory=TrainCfg)
+    centering: str = "box"                  # box | origin — see CENTERING_DOMAINS
     use_encoder_pose: bool = False          # Apply learned encoder pose to flow output (unidirectional only)
     freeze_flow_at_identity: bool = False   # If True, skip flow computation; encoder learns pose only
 
@@ -122,7 +139,7 @@ class ExperimentCfg:
 
         Handles nested config for encoder_config and graph_spec.
         """
-        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "use_encoder_pose", "freeze_flow_at_identity"}
+        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "centering", "use_encoder_pose", "freeze_flow_at_identity"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
@@ -131,6 +148,13 @@ class ExperimentCfg:
         loss_cfg = LossCfg(**d.get("loss", {})) if "loss" in d else LossCfg()
         augmentation_cfg = AugmentationCfg(**d.get("augmentation", {})) if "augmentation" in d else AugmentationCfg()
         train_cfg = TrainCfg(**d.get("train", {})) if "train" in d else TrainCfg()
+
+        centering = d.get("centering", "box")
+        if centering not in CENTERING_DOMAINS:
+            raise ValueError(
+                f"unknown centering {centering!r}; expected one of "
+                f"{sorted(CENTERING_DOMAINS)}"
+            )
 
         # Handle code config with special parsing for encoder_config and graph_spec
         code_dict = d.get("code", {})
@@ -145,6 +169,7 @@ class ExperimentCfg:
             loss=loss_cfg,
             augmentation=augmentation_cfg,
             train=train_cfg,
+            centering=centering,
             use_encoder_pose=d.get("use_encoder_pose", False),
             freeze_flow_at_identity=d.get("freeze_flow_at_identity", False),
         )

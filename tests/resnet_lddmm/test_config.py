@@ -86,3 +86,47 @@ def test_experiment_cfg_multiple_unknown_keys():
     }
     with pytest.raises(ValueError, match="Unknown config keys:"):
         ExperimentCfg.from_dict(d)
+
+
+class TestCentering:
+    """`centering` decides where the ORIGIN sits relative to the shapes.
+
+    Load-bearing rather than cosmetic: poses are applied as ``points @ R``, about the
+    origin, so "box" makes a rotation an orbit around a corner 0.87 away while "origin"
+    makes it a spin in place. That in turn decides whether a rotation-only pose can
+    reach a sample which arrived already rotated.
+    """
+
+    @staticmethod
+    def _cfg(**extra):
+        return ExperimentCfg.from_dict({"source": "s", "target": "t", "output_dir": "o",
+                                        **extra})
+
+    def test_defaults_to_box(self):
+        assert self._cfg().centering == "box"
+
+    def test_origin_parses(self):
+        assert self._cfg(centering="origin").centering == "origin"
+
+    def test_unknown_value_rejected_with_the_valid_ones(self):
+        import pytest
+        with pytest.raises(ValueError, match="unknown centering 'middle'.*box.*origin"):
+            self._cfg(centering="middle")
+
+    def test_domains_are_the_documented_boxes(self):
+        from src.resnet_lddmm.config import CENTERING_DOMAINS
+
+        assert CENTERING_DOMAINS["box"] == (0.0, 1.0)
+        assert CENTERING_DOMAINS["origin"] == (-0.5, 0.5)
+        # Same edge length either way, so ONLY the offset differs -- that is what makes
+        # a box/origin comparison a controlled experiment rather than a rescaling.
+        assert (CENTERING_DOMAINS["box"][1] - CENTERING_DOMAINS["box"][0]
+                == CENTERING_DOMAINS["origin"][1] - CENTERING_DOMAINS["origin"][0])
+
+    def test_runner_resolves_the_domain(self):
+        from src.resnet_lddmm.runner import _normalization_domain
+        from types import SimpleNamespace
+
+        assert _normalization_domain(self._cfg()) == (0.0, 1.0)
+        assert _normalization_domain(self._cfg(centering="origin")) == (-0.5, 0.5)
+        assert _normalization_domain(SimpleNamespace()) == (0.0, 1.0)   # stub cfg

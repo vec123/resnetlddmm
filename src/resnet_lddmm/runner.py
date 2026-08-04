@@ -14,7 +14,7 @@ import random
 import numpy as np
 import torch
 
-from src.resnet_lddmm.config import ExperimentCfg
+from src.resnet_lddmm.config import ExperimentCfg, CENTERING_DOMAINS
 from src.resnet_lddmm.io import load_shape, joint_normalize, export_trajectory
 from src.resnet_lddmm.registration.pair import PairRegistration
 from src.resnet_lddmm.registration.cohort import CohortRegistration
@@ -140,6 +140,15 @@ def seed_everything(seed):
     key = torch.Generator(device="cpu")
     key.manual_seed(seed)
     return key
+
+
+def _normalization_domain(cfg):
+    """cfg.centering -> the (min, max) domain joint_normalize places shapes in.
+
+    getattr so a stub config without the field still builds, matching how the rest
+    of this module reads optional attributes.
+    """
+    return CENTERING_DOMAINS[getattr(cfg, "centering", "box")]
 
 
 def _build_loss_terms(loss_cfg):
@@ -403,7 +412,8 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_enco
     # Load and normalize shapes
     source_shape = load_shape(cfg.source)
     target_shape = load_shape(cfg.target)
-    normalized, transform = joint_normalize([source_shape, target_shape])
+    normalized, transform = joint_normalize([source_shape, target_shape],
+                                           domain=_normalization_domain(cfg))
     source_norm, target_norm = normalized
 
     # Create mapping error strategy after knowing source size
@@ -450,7 +460,8 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_en
     target_shape = load_shape(cfg.target)
 
     # Normalize cohort + template together
-    normalized, transform = joint_normalize(cohort_shapes + [target_shape])
+    normalized, transform = joint_normalize(cohort_shapes + [target_shape],
+                                           domain=_normalization_domain(cfg))
     cohort_norm = normalized[:-1]
     target_norm = normalized[-1]
 
@@ -488,6 +499,7 @@ def _dump_config(cfg, mode):
     with open(config_path, "w") as f:
         json.dump({
             "mode": mode,
+            "centering": getattr(cfg, "centering", "box"),
             "source": cfg.source,
             "target": cfg.target,
             "field": {
