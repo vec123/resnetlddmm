@@ -75,6 +75,85 @@ def apply_pose(points: Tensor, rotation: Optional[Tensor],
     return points
 
 
+def procrustes_rotation(X: Tensor, Y: Tensor) -> Tensor:
+    """Optimal rotation R minimising ``||X @ R - Y||`` over SO(3), in closed form.
+
+    Orthogonal Procrustes / Kabsch, in the RIGHT-multiplication convention used by
+    :func:`apply_pose`. Both clouds are mean-centred first, so the answer is the
+    rotation alone and never absorbs a translation.
+
+    Requires X and Y to be in vertex correspondence, row for row.
+
+    Args:
+        X: [B, N, 3] source cloud
+        Y: [B, N, 3] target cloud, corresponded row-for-row with X
+
+    Returns:
+        [B, 3, 3] proper rotations (det = +1; reflections excluded)
+    """
+    Xc = X - X.mean(dim=1, keepdim=True)
+    Yc = Y - Y.mean(dim=1, keepdim=True)
+    H = Xc.transpose(1, 2) @ Yc                                   # [B, 3, 3]
+    U, _, Vh = torch.linalg.svd(H)
+    V = Vh.transpose(1, 2)
+    # det = -1 would be a reflection, not a rotation; flip the least-significant
+    # singular direction to stay inside SO(3).
+    det = torch.det(U @ V.transpose(1, 2))
+    ones = torch.ones_like(det)
+    D = torch.diag_embed(torch.stack([ones, ones, det], dim=-1))
+    return U @ D @ V.transpose(1, 2)
+
+
+class FlowRotationPenalty(nn.Module):
+    """||R_flow - I||_F^2, where R_flow is the net rigid rotation the deformation applies.
+
+    Fixes the pose/deformation GAUGE. The data term only ever sees the product
+    ``phi(T) @ R_hat``, so for any rotation A the pair ``(phi(T)@A, A^-1 @ R_hat)``
+    predicts exactly the same points -- a 3-parameter family of equally optimal
+    answers, of which training picks one arbitrarily. The symptom is
+    ``pose_supervision_loss`` pinned at ``||A^-1 - I||_F^2`` (~6 for a random A, since
+    R_aug cancels out of that expression) while the data term falls happily.
+
+    This is the only term that can see the split, because it looks at ``phi(T)``
+    alone rather than at the product. Driving R_flow to identity selects A = I, which
+    means the deformation performs no net rotation and R_hat carries the whole pose --
+    the factorisation implied by "the template defines the canonical frame".
+
+    Correspondence, which Procrustes needs, holds STRUCTURALLY here: the integrator is
+    elementwise, so ``phi(T)[i]`` is by construction the image of ``T[i]``. (Between
+    the deformed template and a SAMPLE it would not hold, which is a different and
+    much less safe use of the same algorithm.)
+
+    Translation is not penalised: Procrustes mean-centres both clouds, and a net
+    translation of the flow is genuinely needed to match shapes whose centroids
+    differ -- it is not gauge, because R_hat cannot absorb it.
+
+    Weighting: the data term is EXACTLY flat along the gauge, so any weight > 0
+    selects A = I with nothing opposing it; the weight only sets how fast. Keep it
+    small so it stays a tie-breaker. Genuine articulated motion, whose net Procrustes
+    rotation is not pose, sits on a CURVED direction and is biased by a factor
+    ``D'' / (D'' + 4w)`` -- negligible while ``w << D''/4``. The empirical check is to
+    raise the weight 10x: if the data term does not move, the penalty is acting only
+    on flat directions and cannot be distorting geometry.
+    """
+
+    def forward(self, ctx: LossContext) -> Optional[Tensor]:
+        """Compute ||R_flow - I||_F^2 for the current deformation.
+
+        Args:
+            ctx: the step's LossContext
+
+        Returns:
+            Scalar tensor, or None when there is no trajectory to measure
+        """
+        if ctx.fwd_traj is None or ctx.template_points is None:
+            return None
+
+        rotation = procrustes_rotation(ctx.template_points, ctx.fwd_traj.end)
+        identity = torch.eye(3, dtype=rotation.dtype, device=rotation.device)
+        return (rotation - identity).pow(2).sum(dim=(-2, -1)).mean()
+
+
 class PoseSupervisionLoss(nn.Module):
     """Supervise the predicted pose against the group element the augmenter drew.
 

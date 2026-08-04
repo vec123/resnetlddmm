@@ -1,12 +1,15 @@
 """Tests for config-selected loss terms (losses/terms.py) and their wiring."""
 
+import math
+
 import pytest
 import torch
 from types import SimpleNamespace
 
 from src.resnet_lddmm.losses.mapping_error import UnidirectionalMappingError
 from src.resnet_lddmm.losses.terms import (
-    LossContext, EquivariantDeformationLoss, PoseSupervisionLoss, apply_pose,
+    LossContext, EquivariantDeformationLoss, PoseSupervisionLoss,
+    FlowRotationPenalty, apply_pose, procrustes_rotation,
 )
 from src.resnet_lddmm.losses.data_terms import L2Data
 from src.resnet_lddmm.fields.time_varying import TimeVaryingField
@@ -450,3 +453,96 @@ class TestPoseSupervisionLoss:
         entries, modules = _build_loss_terms(on)
         assert [e.name for e in entries] == ["pose_supervision_loss"]
         assert entries[0].weight == 3.0
+
+
+class TestFlowRotationPenalty:
+    """||R_flow - I||_F^2 -- fixes the pose/deformation gauge."""
+
+    @staticmethod
+    def _ctx(template, deformed):
+        return LossContext(template_points=template,
+                           fwd_traj=SimpleNamespace(end=deformed))
+
+    def test_zero_for_the_identity_deformation(self):
+        pts = torch.randn(1, 60, 3)
+        value = FlowRotationPenalty()(self._ctx(pts, pts.clone()))
+        assert value.item() == pytest.approx(0.0, abs=1e-9)
+
+    def test_zero_for_a_pure_translation(self):
+        """Procrustes mean-centres, so a net translation is not penalised.
+
+        Deliberate: R_hat cannot absorb a translation, so it is not gauge -- the flow
+        genuinely needs it to match shapes whose centroids differ.
+        """
+        pts = torch.randn(1, 60, 3)
+        moved = pts + torch.tensor([[0.4, -0.3, 0.2]])
+        assert FlowRotationPenalty()(self._ctx(pts, moved)).item() == pytest.approx(0.0, abs=1e-9)
+
+    def test_matches_the_closed_form_for_a_pure_rotation(self):
+        """||R - I||_F^2 = 8 sin^2(theta/2) -- the value reads directly as an angle."""
+        pts = torch.randn(1, 200, 3)
+        for angle in (0.3, 0.9, 2.0):
+            rotated = apply_pose(pts, _rotation(angle), None)
+            expected = 8 * math.sin(angle / 2) ** 2
+            got = FlowRotationPenalty()(self._ctx(pts, rotated)).item()
+            assert got == pytest.approx(expected, rel=1e-3), f"angle={angle}"
+
+    def test_zero_for_a_rotation_free_deformation(self):
+        """A deformation carrying no net rotation is not penalised.
+
+        Uniform scaling gives H = c*X^T X, symmetric PSD, so Procrustes returns exactly
+        I. Note an ANISOTROPIC stretch would not: H = X^T X diag(s) is asymmetric unless
+        the stretch axes are the data's principal axes, and the term correctly reports
+        the small net rotation such a warp really does carry.
+        """
+        torch.manual_seed(0)
+        pts = torch.randn(1, 300, 3)
+        scaled = 1.3 * pts + torch.tensor([[0.2, -0.1, 0.4]])   # scale + shift, no rotation
+
+        assert FlowRotationPenalty()(self._ctx(pts, scaled)).item() < 1e-6
+
+    def test_gradient_reaches_the_deformation(self):
+        torch.manual_seed(0)
+        pts = torch.randn(1, 80, 3)
+        deformed = apply_pose(pts, _rotation(0.8), None).clone().requires_grad_(True)
+
+        FlowRotationPenalty()(self._ctx(pts, deformed)).backward()
+
+        assert deformed.grad is not None and deformed.grad.abs().max() > 0
+
+    def test_none_without_a_trajectory(self):
+        assert FlowRotationPenalty()(LossContext()) is None
+
+    def test_registry_and_gating(self):
+        from src.resnet_lddmm.runner import _build_loss_terms
+
+        assert isinstance(Registry.create("loss_term", "flow_rotation_penalty"),
+                          FlowRotationPenalty)
+
+        off = SimpleNamespace(terms=[], flow_rotation_penalty_weight=0.0,
+                              flow_rotation_penalty_kwargs={})
+        assert _build_loss_terms(off) == ([], {})
+
+        on = SimpleNamespace(terms=[], flow_rotation_penalty_weight=0.1,
+                             flow_rotation_penalty_kwargs={})
+        entries, modules = _build_loss_terms(on)
+        assert [e.name for e in entries] == ["flow_rotation_penalty"]
+        assert entries[0].weight == 0.1
+
+    def test_identifies_the_gauge_it_exists_to_remove(self):
+        """The scenario from the analysis: flow absorbs A, R_hat compensates.
+
+        The data term is blind to this (predictions identical); only this term sees it.
+        """
+        torch.manual_seed(0)
+        template = torch.randn(1, 200, 3)
+        A = _rotation(0.7)
+        canonical = 1.2 * template + torch.tensor([[0.3, 0.0, -0.2]])   # honest deformation
+
+        # config 2: flow does the deformation only -> no net rotation
+        assert FlowRotationPenalty()(self._ctx(template, canonical)).item() < 1e-6
+        # config 1: flow also absorbs A -> penalised by exactly ||A - I||_F^2
+        absorbed = apply_pose(canonical, A, None)
+        expected = 8 * math.sin(0.7 / 2) ** 2
+        assert FlowRotationPenalty()(self._ctx(template, absorbed)).item() == pytest.approx(
+            expected, rel=1e-2)
