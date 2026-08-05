@@ -27,7 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger, PoseShapeExporter
 
 
 def _encoder_layers_to_list_of_dicts(encoder_config):
@@ -575,6 +575,11 @@ def run(cfg: ExperimentCfg, callbacks=None):
         pose_log_cadence = getattr(cfg.train, 'log_every', 50)
         augmentation_kind = cfg.augmentation.kind if hasattr(cfg, 'augmentation') else 'se3'
         callbacks.append(PoseLogger(every_n_steps=pose_log_cadence, augmentation_kind=augmentation_kind))
+        # The pose as GEOMETRY rather than as a matrix: phi(T) before and after the
+        # predicted pose, plus the sample it should land on. Shares save_every with the
+        # trajectory export, since both write .vtp and are read the same way.
+        callbacks.append(PoseShapeExporter(every_n_steps=save_every,
+                                           export_shapes=export_shapes or 2))
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,

@@ -1043,3 +1043,104 @@ class PoseLogger(Callback):
                         row[f'rotation_{i}{j}'] = R[i][j]
 
             writer.writerow(row)
+
+
+class PoseShapeExporter(Callback):
+    """Export the shape before and after the predicted pose, as .vtp.
+
+    PoseLogger records the pose as numbers; this writes the geometry, so the
+    alignment can be judged by eye in ParaView rather than inferred from a matrix.
+
+    Per step, per exported shape:
+
+        before.vtp    phi(T)          the deformed template, in the CANONICAL frame,
+                                      i.e. before the predicted pose is applied
+        after.vtp     phi(T) @ R_hat  the same points with the pose applied -- exactly
+                                      what the data term compares against the sample
+        target.vtp    the augmented sample, i.e. what `after` should converge onto
+
+    Load all three together and colour by ``point_id`` to follow individual vertices:
+    `after` and `target` should coincide when the pose is right, while `before` shows
+    how much of the discrepancy was pose rather than deformation.
+
+    Coordinates are the NORMALIZED frame, not world -- the pose is defined there, and
+    mapping back through FrameTransform would fold in a rotation the pose head never
+    saw. That is deliberate and differs from TrajectoryExporter, which does export to
+    world coordinates.
+
+    Reads what mapping_error recorded for the step it just finished, so it re-does no
+    computation and cannot perturb training: `last_fwd_traj` for phi(T) and
+    `last_effective_pose` for the pose that was actually applied (post the
+    requires_grad filter, so this shows the real transform, not the predicted one).
+    """
+
+    def __init__(self, every_n_steps=100, export_shapes=2, subdir="pose_shapes"):
+        """Initialize the exporter.
+
+        Args:
+            every_n_steps: cadence
+            export_shapes: how many shapes of the batch to write (0 = all)
+            subdir: directory under ctx.log_dir to write into
+        """
+        super().__init__(every_n_steps)
+        self.export_shapes = export_shapes
+        self.subdir = subdir
+
+    def on_step_end(self, ctx, step, metrics, batch, pred):
+        """Write before/after/target for this step, if due."""
+        if not self._due(step):
+            return
+
+        stepper = ctx.stepper
+        mapping_error = getattr(stepper, "mapping_error", None)
+        if mapping_error is None or getattr(mapping_error, "last_fwd_traj", None) is None:
+            return
+
+        rotation, translation = getattr(mapping_error, "last_effective_pose", (None, None))
+        if rotation is None and translation is None:
+            return  # no pose was applied; before and after would be identical
+
+        from src.resnet_lddmm.losses.terms import apply_pose
+        from src.vtk.create import create_polydata
+        from src.vtk.fields import add_point_field
+        from src.vtk.io import save_vtp
+
+        before = mapping_error.last_fwd_traj.end.detach()
+        after = apply_pose(before, rotation, translation).detach()
+        target = self._target_points(stepper, mapping_error)
+
+        out_dir = os.path.join(ctx.log_dir, self.subdir, f"step_{step}")
+        os.makedirs(out_dir, exist_ok=True)
+
+        count = before.shape[0] if self.export_shapes == 0 else min(self.export_shapes,
+                                                                   before.shape[0])
+        for b in range(count):
+            clouds = {"before": before[b], "after": after[b]}
+            if target is not None and b < target.shape[0]:
+                clouds["target"] = target[b]
+            for name, points in clouds.items():
+                polydata = create_polydata(points, faces=None)
+                ids = np.arange(points.shape[0], dtype=np.float32)
+                polydata = add_point_field(polydata, ids, field_name="point_id")
+                save_vtp(polydata, os.path.join(out_dir, f"shape_{b}_{name}.vtp"),
+                         binary=True)
+
+        print(f"[PoseShapeExporter] step {step}: wrote before/after/target for "
+              f"{count} shape(s) -> {out_dir}")
+
+    @staticmethod
+    def _target_points(stepper, mapping_error):
+        """The augmented sample the prediction is compared against, or None.
+
+        Prefers what mapping_error actually used (subsampled, so it lines up with
+        `after` point-for-point); falls back to the stepper's stored augmented batch,
+        whose attribute name differs between the pair and cohort steppers.
+        """
+        points = getattr(mapping_error, "last_sample_points", None)
+        if points is not None:
+            return points.detach()
+        for attribute in ("augmented_sample_batch", "augmented_sample"):
+            sample = getattr(stepper, attribute, None)
+            if sample is not None and getattr(sample, "points", None) is not None:
+                return sample.points.detach()
+        return None
