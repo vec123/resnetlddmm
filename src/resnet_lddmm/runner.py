@@ -27,7 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
-from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger, PoseShapeExporter
+from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger, PoseShapeExporter, LossLogger
 
 
 def _encoder_layers_to_list_of_dicts(encoder_config):
@@ -580,6 +580,13 @@ def run(cfg: ExperimentCfg, callbacks=None):
         # trajectory export, since both write .vtp and are read the same way.
         callbacks.append(PoseShapeExporter(every_n_steps=save_every,
                                            export_shapes=export_shapes or 2))
+
+    # The loss breakdown as JSON. LAST in the list on purpose: metrics is one dict
+    # shared by every callback, so running last is what lets DiagnosticsCallback's
+    # diag/* and the gradient stats land in the same record instead of a step late.
+    # (re-read the cadence rather than reusing log_every: that name only exists on
+    # the branch that builds the default list, not when callbacks were passed in)
+    callbacks.append(LossLogger(every_n_steps=getattr(cfg.train, 'log_every', 50)))
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,
