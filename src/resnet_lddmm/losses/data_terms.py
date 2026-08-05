@@ -335,6 +335,10 @@ class SinkhornData(DataTerm):
     Recommended for articulated shapes (e.g., hands) where Chamfer can
     produce incorrect finger-to-finger matchings.
 
+    Point weights are normalised to probability measures before being handed to
+    geomloss, which solves BALANCED transport and therefore needs both sides to
+    carry equal mass; see _as_measure.
+
     Lazy-loads geomloss: auto-decoder configs work even without it installed.
     """
 
@@ -399,16 +403,46 @@ class SinkhornData(DataTerm):
             p_b = pred[b]  # [N, 3]
             t_b = target[b]  # [M, 3]
 
-            # Compute Sinkhorn loss; weights can be None
             loss_b = loss_fn(
-                pred_w[b] if pred_w is not None else torch.ones(N, device=pred.device),
+                self._as_measure(None if pred_w is None else pred_w[b], N, p_b),
                 p_b,
-                tgt_w[b] if tgt_w is not None else torch.ones(M, device=target.device),
+                self._as_measure(None if tgt_w is None else tgt_w[b], M, t_b),
                 t_b,
             )
             loss_total = loss_total + loss_b
 
         return loss_total / B
+
+    @staticmethod
+    def _as_measure(weights, count, like):
+        """Per-point weights as a probability measure: non-negative, summing to one.
+
+        geomloss solves BALANCED optimal transport, so both arguments must carry the
+        same total mass. Passing raw ``ones(N)`` gives mass N rather than 1, which
+        rescales the loss by that mass -- and is outright ill-posed once N != M, as
+        happens whenever the two clouds are subsampled to different sizes.
+        Normalising also makes the value independent of the point count, so a run is
+        comparable across subsample_M settings.
+
+        Args:
+            weights: [K] per-point weights, or None for uniform
+            count: K, the number of points
+            like: tensor supplying device and dtype
+
+        Returns:
+            [K] non-negative weights summing to 1
+        """
+        uniform = torch.full((count,), 1.0 / count, device=like.device, dtype=like.dtype)
+        if weights is None:
+            return uniform
+
+        w = weights.to(dtype=like.dtype).clamp_min(0)
+        total = w.sum()
+        # Degenerate input (all zero, or negative before clamping) would divide by ~0
+        # and hand geomloss a non-finite measure; fall back rather than propagate it.
+        if not torch.isfinite(total) or total <= 0:
+            return uniform
+        return w / total
 
 
 class EMDData(DataTerm):

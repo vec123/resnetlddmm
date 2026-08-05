@@ -841,3 +841,67 @@ class TestAutoDecoderWithoutGeomloss:
         from src.resnet_lddmm.codes.auto_decoder import AutoDecoderCodes
         codes = AutoDecoderCodes(num_shapes=5, n_z=3)
         assert hasattr(codes, 'forward')
+
+
+class TestSinkhornNormalisedWeights:
+    """geomloss solves BALANCED OT, so both measures must carry equal mass.
+
+    Passing raw ones() gave mass N and M instead of 1: the loss was scaled by the
+    point count, and the problem was ill-posed whenever N != M.
+    """
+
+    @staticmethod
+    def _term(**kwargs):
+        from src.resnet_lddmm.losses.data_terms import SinkhornData
+        return SinkhornData(**kwargs)
+
+    def test_uniform_measure_sums_to_one(self):
+        like = torch.zeros(1)
+        w = self._term()._as_measure(None, 5, like)
+
+        assert w.shape == (5,)
+        assert w.sum().item() == pytest.approx(1.0)
+        assert torch.allclose(w, torch.full((5,), 0.2))
+
+    def test_explicit_weights_are_normalised(self):
+        like = torch.zeros(1)
+        w = self._term()._as_measure(torch.tensor([1.0, 3.0]), 2, like)
+
+        assert w.sum().item() == pytest.approx(1.0)
+        assert torch.allclose(w, torch.tensor([0.25, 0.75]))   # ratio preserved
+
+    def test_degenerate_weights_fall_back_to_uniform(self):
+        """All-zero (or negative) weights would divide by ~0 and poison the solver."""
+        like = torch.zeros(1)
+        for bad in (torch.zeros(4), torch.tensor([-1.0, -2.0, -3.0, -4.0])):
+            w = self._term()._as_measure(bad, 4, like)
+            assert w.sum().item() == pytest.approx(1.0)
+            assert torch.allclose(w, torch.full((4,), 0.25))
+
+    def test_value_is_independent_of_point_count(self):
+        """The headline consequence: doubling the sampling must not double the loss."""
+        pytest.importorskip("geomloss")
+        torch.manual_seed(0)
+        term = self._term(blur=0.1)
+        pred = torch.randn(1, 128, 3)
+        target = torch.randn(1, 128, 3)
+
+        sparse = term(pred, target).item()
+        dense = term(pred.repeat(1, 2, 1), target.repeat(1, 2, 1)).item()
+
+        assert dense == pytest.approx(sparse, rel=0.05)
+
+    def test_handles_unequal_point_counts(self):
+        """N != M is balanced only once both sides are normalised."""
+        pytest.importorskip("geomloss")
+        torch.manual_seed(0)
+        value = self._term(blur=0.1)(torch.randn(1, 100, 3), torch.randn(1, 137, 3))
+
+        assert torch.isfinite(value) and value.item() > 0
+
+    def test_zero_between_identical_clouds(self):
+        pytest.importorskip("geomloss")
+        torch.manual_seed(0)
+        cloud = torch.randn(1, 64, 3)
+
+        assert self._term(blur=0.05)(cloud, cloud.clone()).item() == pytest.approx(0.0, abs=1e-4)
