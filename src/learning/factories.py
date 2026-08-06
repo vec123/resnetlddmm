@@ -49,6 +49,7 @@ def build_encoder(cfg):
         transformer_cfg=cfg.transformer_cfg,
         area_pool=cfg.area_pool,
         latent_mode=cfg.latent_mode,
+        pose_mode=cfg.pose_mode,
         verbose=cfg.verbose,
     )
 

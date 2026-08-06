@@ -63,11 +63,25 @@ class EncoderConfig:
     supernode_seed: Optional[int] = 1
     area_pool: bool = False
     latent_mode: str = "gaussian"  # "gaussian" | "deterministic"
+    # How the rotation frame is built from the 1o vectors. "first_moment" pools a
+    # sum that nearly cancels over a closed surface; "second_moment" fixes that;
+    # "polar" keeps first-moment pooling but orthogonalises symmetrically instead of
+    # by Gram-Schmidt. See GroupEncoder.
+    pose_mode: str = "first_moment"  # "first_moment" | "second_moment" | "polar"
     verbose: bool = False 
+
+    POSE_MODES = ("first_moment", "second_moment", "polar")
 
     def __post_init__(self):
         if not self.layers:
             raise ValueError("EncoderConfig.layers must be non-empty.")
+        # Caught here rather than in GroupEncoder so a typo fails while the YAML is
+        # being parsed, not several seconds into building the model.
+        if self.pose_mode not in self.POSE_MODES:
+            raise ValueError(
+                f"unknown pose_mode {self.pose_mode!r}; expected one of "
+                f"{list(self.POSE_MODES)}"
+            )
         for i in range(len(self.layers) - 1):
             out_ir = o3.Irreps(self.layers[i].target_irreps)
             next_in_ir = o3.Irreps(self.layers[i + 1].in_irreps)

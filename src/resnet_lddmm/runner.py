@@ -84,6 +84,7 @@ def _build_encoder_code_source(encoder_config, graph_spec, n_z):
         supernode_seed=encoder_config.supernode_seed,
         area_pool=encoder_config.area_pool,
         latent_mode=encoder_config.latent_mode,
+        pose_mode=encoder_config.pose_mode,
         verbose=encoder_config.verbose,
     )
 

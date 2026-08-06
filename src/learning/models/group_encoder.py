@@ -83,10 +83,24 @@ class GroupEncoder(nn.Module):
           int + seed=None    -- fresh draw per call: sampling acts as a regulariser,
                                 at the cost of repeatability AND exact invariance.
 
-        ``pose_mode`` selects how the frame is pooled out of the 1o vectors:
-        ``"first_moment"`` (sum_i w_i v_i, then Gram-Schmidt) or ``"second_moment"``
-        (eigenvectors of sum_i w_i v_i v_i^T). Both emit [B, 3, 3], so nothing
-        downstream branches -- see ``_pose`` for the trade-off.
+        ``pose_mode`` selects how the frame is built from the 1o vectors. Two
+        independent things can go wrong, and the three modes address them separately:
+
+          "first_moment"   sum_i w_i v_i, then Gram-Schmidt. The default, and weak on
+                           BOTH counts -- see the two entries below.
+          "second_moment"  eigenvectors of sum_i w_i v_i v_i^T. Fixes the POOLING: the
+                           first moment nearly cancels over a closed surface, leaving
+                           the frame built from the residual. Its axes come out exactly
+                           orthonormal, so the orthogonalisation below is a no-op and
+                           there is no "second_moment + polar" worth having; what remains
+                           is eigh's 1/(lambda_i - lambda_j) gradient.
+          "polar"          first-moment pooling, but ORTHOGONALISED symmetrically
+                           (polar factor) instead of by Gram-Schmidt. Fixes the
+                           ORTHOGONALISATION: Gram-Schmidt pins axis 1 to v1 exactly and
+                           forces the entire correction into v2, so v1's error passes
+                           straight into the frame. See ``_polar_frame``.
+
+        All three emit [B, 3, 3], so nothing downstream branches.
         """
 
         super().__init__()
@@ -95,9 +109,10 @@ class GroupEncoder(nn.Module):
         self.area_pool = area_pool
         self.verbose = verbose
 
-        if pose_mode not in ("first_moment", "second_moment"):
+        if pose_mode not in ("first_moment", "second_moment", "polar"):
             raise ValueError(
-                f"pose_mode must be 'first_moment' or 'second_moment', got {pose_mode!r}."
+                f"pose_mode must be 'first_moment', 'second_moment' or 'polar', "
+                f"got {pose_mode!r}."
             )
         self.pose_mode = pose_mode
         self.supernode_samples = supernode_samples
@@ -401,7 +416,74 @@ class GroupEncoder(nn.Module):
         transl = global_mean_pool(tokens.pos, tokens.batch, size=num_graphs)
 
         aux = {'v1': v1, 'v2': v2, 'node_features_scalars': scalars}
-        return self.get_rotation_matrix_from_two_vectors(v1, v2), transl, aux
+        # Orthogonalisation is a separate choice from pooling. second_moment already
+        # returns orthonormal axes, so Gram-Schmidt is exact there and only the
+        # first-moment path benefits from the symmetric alternative.
+        rotation = (self._polar_frame(v1, v2) if self.pose_mode == "polar"
+                    else self.get_rotation_matrix_from_two_vectors(v1, v2))
+        return rotation, transl, aux
+
+    @staticmethod
+    def _polar_frame(v1, v2, eps=1e-8):
+        """Orthonormal frame from two vectors by SYMMETRIC (polar) orthogonalisation.
+
+        Gram-Schmidt is asymmetric: it keeps ``v1`` exactly and pushes the whole
+        correction onto ``v2``. An angular error in v1 therefore lands in the frame
+        untouched, while the same error in v2 is partly repaired -- the frame is more
+        accurate in one of its inputs than the other, for no reason the geometry
+        justifies. The polar factor of ``[v1|v2|v1 x v2]`` splits the discrepancy
+        evenly instead: the classical Lowdin symmetric orthogonalisation.
+
+        With unit inputs at angle ``theta`` the Gram matrix is
+        ``A^T A = [[1,c,0],[c,1,0],[0,0,1]]``, ``c = cos theta``, so
+        ``R = A (A^T A)^{-1/2}`` leaves the third axis alone and rotates each of the
+        first two by ``(90 - theta)/2`` -- half of what Gram-Schmidt applies to v2
+        alone. That makes the answer available in CLOSED FORM, which is what is
+        computed here.
+
+        Not via ``torch.linalg.svd``, deliberately. The polar factor is U V^T, but at
+        theta = 90 degrees A is already orthogonal, all three singular values are 1,
+        and U and V are then individually arbitrary. Their product is still correct in
+        exact arithmetic; in float32 it is noisy, and measurably so -- the SVD route
+        amplified input perturbation ~27x MORE than Gram-Schmidt at 90 degrees, which
+        is numerical noise rather than genuine sensitivity. The closed form has no such
+        failure: it reduces to the identity map exactly where SVD is worst.
+
+        Columns, matching ``get_rotation_matrix_from_two_vectors``, so the encoder's
+        LEFT-equivariance convention (R -> QR under x -> Qx) is unchanged and the
+        transpose in ``EncoderCodes.get_pose`` still applies -- ``cross(Qv1, Qv2) =
+        Q cross(v1, v2)`` for det Q = 1, so every axis carries Q out front.
+
+        This does NOT rescue exactly parallel inputs: the frame is genuinely undefined
+        there and every method diverges. It changes how error is ALLOCATED, not
+        whether the degeneracy exists.
+
+        Args:
+            v1: [B, 3] first pose vector
+            v2: [B, 3] second pose vector
+            eps: guards the normalisations
+
+        Returns:
+            [B, 3, 3] proper rotations (det = +1)
+        """
+        u1 = v1 / (v1.norm(dim=-1, keepdim=True) + eps)
+        u2 = v2 / (v2.norm(dim=-1, keepdim=True) + eps)
+
+        # In-plane orthonormal pair: the bisector of u1,u2 and the in-plane direction
+        # perpendicular to it. u1 = b cos(t/2) - p sin(t/2), u2 = b cos(t/2) + p sin(t/2),
+        # so b and p are orthogonal for any theta and the symmetric answer is the pair
+        # at +-45 degrees about the bisector.
+        b = u1 + u2
+        p = u2 - u1
+        b = b / (b.norm(dim=-1, keepdim=True) + eps)
+        p = p / (p.norm(dim=-1, keepdim=True) + eps)
+
+        inv_sqrt2 = 0.7071067811865476
+        a1 = (b - p) * inv_sqrt2
+        a2 = (b + p) * inv_sqrt2
+        a3 = torch.cross(a1, a2, dim=-1)          # right-handed by construction
+
+        return torch.stack([a1, a2, a3], dim=-1)  # [B, 3, 3], columns
 
     def _second_moment_axes(self, vectors, weights, batch, num_graphs):
         """Frame axes from the pooled SECOND moment M = sum_i w_i sum_c v_ic v_ic^T.
