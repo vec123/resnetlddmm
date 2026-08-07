@@ -27,6 +27,7 @@ from src.learning.losses.composer import LossComposer, LossTerm
 from src.learning.loader.loaders import OneBatchLoader, CohortBatchLoader
 from src.learning.trainers.E3_end2end import TrainingOrchestrator
 from src.learning.callbacks.base import Callback
+from src.learning.callbacks.checkpointing import CheckpointWriter
 from src.resnet_lddmm.callbacks import TrajectoryExporter, DiagnosticsCallback, EncoderGraphLogger, GradientLogger, NetworkStructureInspector, RequiresGradMonitor, PoseLogger, PoseShapeExporter, LossLogger
 
 
@@ -562,6 +563,14 @@ def run(cfg: ExperimentCfg, callbacks=None):
             TrajectoryExporter(every_n_steps=save_every, export_shapes=export_shapes,
                              export_strategy=export_strategy, rng=export_rng),
             DiagnosticsCallback(every_n_steps=save_every),
+            # The weights themselves, to output_dir/checkpoints. Everything else in
+            # this list writes something DERIVED from the model -- geometry, metrics,
+            # gradient stats -- none of which can reconstruct it, so without this a
+            # finished run leaves nothing to evaluate or resume from. Saves
+            # {step, flow, codes, optimizer} (the encoder rides along inside `codes`,
+            # which is an nn.Module holding it), plus a final.pt on train end so the
+            # last weights survive a run that doesn't stop on the cadence.
+            CheckpointWriter(every_n_steps=save_every),
         ]
 
     stepper, loader, transform = build(cfg)
