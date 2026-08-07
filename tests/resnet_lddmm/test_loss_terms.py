@@ -546,3 +546,69 @@ class TestFlowRotationPenalty:
         expected = 8 * math.sin(0.7 / 2) ** 2
         assert FlowRotationPenalty()(self._ctx(template, absorbed)).item() == pytest.approx(
             expected, rel=1e-2)
+
+
+class TestProcrustesConditioningGuard:
+    """The SVD backward carries 1/(s_i - s_j); warn before it becomes garbage."""
+
+    @staticmethod
+    def _reset():
+        import src.resnet_lddmm.losses.terms as terms_mod
+        terms_mod._procrustes_warnings = 0
+
+    @staticmethod
+    def _isotropic():
+        """Six axis points: covariance exactly isotropic, so all singular values tie."""
+        return torch.tensor([[[1., 0., 0.], [-1., 0., 0.],
+                              [0., 1., 0.], [0., -1., 0.],
+                              [0., 0., 1.], [0., 0., -1.]]])
+
+    def test_warns_on_a_degenerate_shape(self, capsys):
+        self._reset()
+        pts = self._isotropic()
+
+        procrustes_rotation(pts, pts.clone())
+
+        out = capsys.readouterr().out
+        assert "PROCRUSTES_ILL_CONDITIONED" in out
+        assert "near-degenerate" in out
+
+    def test_silent_on_a_well_conditioned_shape(self, capsys):
+        self._reset()
+        torch.manual_seed(0)
+        pts = torch.randn(1, 200, 3) * torch.tensor([3.0, 1.5, 0.5])   # distinct axes
+
+        procrustes_rotation(pts, apply_pose(pts, _rotation(0.6), None))
+
+        assert "PROCRUSTES_ILL_CONDITIONED" not in capsys.readouterr().out
+
+    def test_warnings_are_rate_limited(self, capsys):
+        import src.resnet_lddmm.losses.terms as terms_mod
+        self._reset()
+        pts = self._isotropic()
+
+        for _ in range(terms_mod._PROCRUSTES_WARN_LIMIT + 4):
+            procrustes_rotation(pts, pts.clone())
+
+        out = capsys.readouterr().out          # readouterr CLEARS the buffer: read once
+        assert out.count("PROCRUSTES_ILL_CONDITIONED") == terms_mod._PROCRUSTES_WARN_LIMIT
+        assert "further warnings suppressed" in out
+
+    def test_the_guard_does_not_change_the_result(self, capsys):
+        """Diagnostics only -- the rotation itself must be untouched."""
+        self._reset()
+        torch.manual_seed(0)
+        pts = torch.randn(1, 120, 3)
+        R = _rotation(0.8)
+
+        assert torch.allclose(procrustes_rotation(pts, apply_pose(pts, R, None)), R, atol=1e-5)
+
+    def test_nonfinite_gradient_names_the_cause(self):
+        """A NaN through the rotation must not surface as an anonymous 'non-finite loss'."""
+        from src.resnet_lddmm.losses.terms import _raise_on_nonfinite_grad
+
+        with pytest.raises(FloatingPointError, match="procrustes_rotation"):
+            _raise_on_nonfinite_grad(torch.tensor([float("nan"), 1.0]))
+
+        clean = torch.tensor([1.0, 2.0])
+        assert _raise_on_nonfinite_grad(clean) is clean

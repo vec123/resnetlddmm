@@ -26,10 +26,33 @@ class TrajectoryExporter(Callback):
         self.rng = rng  # torch.Generator for random selection
 
     def on_step_end(self, ctx, step, metrics, batch, pred):
-        """Export trajectory if due."""
+        """Export trajectory if due, in BOTH coordinate spaces.
+
+        world/       denormalised, comparable with the input meshes
+        normalized/  the frame the model actually operates in -- where the pose is
+                     defined, so this is the one to read when judging alignment
+
+        The same geometry twice, differing only by the affine frame transform, so a
+        discrepancy between the two directories means the transform is wrong rather
+        than the model.
+        """
         if not self._due(step):
             return
 
+        identity = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+        world = self.transform if self.transform is not None else identity
+        for space, transform in (("world", world), ("normalized", identity)):
+            self._export_space(ctx, step, batch, pred, transform,
+                               f"{ctx.log_dir}/trajectories/step_{step}/{space}")
+
+    def _export_space(self, ctx, step, batch, pred, transform, base_out_dir):
+        """Write one coordinate space's worth of trajectory files.
+
+        Args:
+            transform: applied via invert(); pass an identity transform to stay in
+                the normalised frame
+            base_out_dir: destination for this space
+        """
         # Trajectory is in the prediction (first return value from stepper.train_step)
         if pred is None:
             print(f"[TrajectoryExporter] Step {step}: pred is None, skipping")
@@ -43,14 +66,6 @@ class TrajectoryExporter(Callback):
         template, sample = batch
         template_faces = template.faces if hasattr(template, "faces") and template.faces is not None else None
         sample_faces = sample.faces if hasattr(sample, "faces") and sample.faces is not None else None
-
-        # Use actual transform from runner, or identity if not set
-        if self.transform is None:
-            transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
-        else:
-            transform = self.transform
-
-        base_out_dir = f"{ctx.log_dir}/trajectories/step_{step}"
 
         try:
             # Extract number of shapes in batch (B dimension)
@@ -154,8 +169,14 @@ class TrajectoryExporter(Callback):
                             faces=template_faces,
                             weights=template.weights[0:1, :] if hasattr(template, 'weights') and template.weights is not None else None,
                         )
-                        # In backward, we show sample as starting point and template as goal
-                        export_reference_shapes(sample_slice, template_slice, transform, bwd_dir)
+                        # Labelled by IDENTITY, not by role: template_points.vtp holds
+                        # the template in both directories, so a file can be loaded
+                        # without checking which one it came from. The flow direction is
+                        # already carried by the forward/ vs backward/ directory name.
+                        # (This writes reference clouds only; it does not touch the flow,
+                        # which still runs template -> sample forward and inverts from the
+                        # sample for the backward trajectory.)
+                        export_reference_shapes(template_slice, sample_slice, transform, bwd_dir)
                     except Exception as e:
                         print(f"[TrajectoryExporter] Reference shape export failed for backward shape {shape_idx}: {e}")
 
@@ -1241,6 +1262,7 @@ class PoseShapeExporter(Callback):
         super().__init__(every_n_steps)
         self.export_shapes = export_shapes
         self.subdir = subdir
+        self.transform = None  # Set by runner after build(), as for TrajectoryExporter
 
     def on_step_end(self, ctx, step, metrics, batch, pred):
         """Write before/after/target for this step, if due."""
@@ -1265,24 +1287,29 @@ class PoseShapeExporter(Callback):
         after = apply_pose(before, rotation, translation).detach()
         target = self._target_points(stepper, mapping_error)
 
-        out_dir = os.path.join(ctx.log_dir, self.subdir, f"step_{step}")
-        os.makedirs(out_dir, exist_ok=True)
-
         count = before.shape[0] if self.export_shapes == 0 else min(self.export_shapes,
                                                                    before.shape[0])
-        for b in range(count):
-            clouds = {"before": before[b], "after": after[b]}
-            if target is not None and b < target.shape[0]:
-                clouds["target"] = target[b]
-            for name, points in clouds.items():
-                polydata = create_polydata(points, faces=None)
-                ids = np.arange(points.shape[0], dtype=np.float32)
-                polydata = add_point_field(polydata, ids, field_name="point_id")
-                save_vtp(polydata, os.path.join(out_dir, f"shape_{b}_{name}.vtp"),
-                         binary=True)
+        identity = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
+        world = self.transform if self.transform is not None else identity
+
+        # Both spaces: `normalized` is where the pose is defined and is the one to
+        # judge alignment in; `world` is comparable with the input meshes.
+        for space, transform in (("normalized", identity), ("world", world)):
+            out_dir = os.path.join(ctx.log_dir, self.subdir, f"step_{step}", space)
+            os.makedirs(out_dir, exist_ok=True)
+            for b in range(count):
+                clouds = {"before": before[b], "after": after[b]}
+                if target is not None and b < target.shape[0]:
+                    clouds["target"] = target[b]
+                for name, points in clouds.items():
+                    polydata = create_polydata(transform.invert(points), faces=None)
+                    ids = np.arange(points.shape[0], dtype=np.float32)
+                    polydata = add_point_field(polydata, ids, field_name="point_id")
+                    save_vtp(polydata, os.path.join(out_dir, f"shape_{b}_{name}.vtp"),
+                             binary=True)
 
         print(f"[PoseShapeExporter] step {step}: wrote before/after/target for "
-              f"{count} shape(s) -> {out_dir}")
+              f"{count} shape(s) in normalized/ and world/")
 
     @staticmethod
     def _target_points(stepper, mapping_error):

@@ -179,9 +179,7 @@ class GroupEncoder(nn.Module):
         #
         # Constructed HERE, between final_linear and weight_net, and internally in
         # the order readout_pool -> mu_net -> var_net: 
-        # nn.Linear draws from the global RNG at construction,
-        # moving this call would change every seeded init and break the
-        # characterization baseline.
+        # nn.Linear draws from the global RNG at construction
         self.latent_mode = latent_mode
         self.latent_head = Registry.create(
             "latent_head", latent_mode,
@@ -242,8 +240,7 @@ class GroupEncoder(nn.Module):
         rotation, translation, pose_aux = self._pose(node_feat, nodes, num_graphs)
 
         # Node features BEFORE final_linear: keeping the full irreps structure (1o
-        # components included) is what makes them usable as geometric descriptors
-        # for matching downstream.
+        # components included) is what makes them potentially usable as geometric descriptors
         aux = {**(latent_out.aux or {}), **pose_aux, 'node_features_full': nodes.feat}
 
         # Attach the pose to whatever latent fields the head produced, without this
@@ -384,20 +381,15 @@ class GroupEncoder(nn.Module):
         n_vec = vectors.shape[1]
         assert n_vec == 2, f"pose needs exactly 2 1o vectors in output_irreps, got {n_vec}"
 
-        # The pose gets its OWN gate (vector_weight_net), not the latent's weight_net:
-        # the two pool different token sets under different normalizations, so one
-        # shared nn.Linear has to compromise between them.
+        # The pose gets its OWN gate (vector_weight_net)
         #
         # Its extra input is the per-channel vector NORMS. They are rotation invariants
         # (0e), so the gate stays invariant and the pooled vector stays equivariant --
         # and unlike the scalars they actually vary across nodes, which is what lets the
-        # gate be selective at all. A uniform gate cannot produce a usable frame here:
-        # sum_i w_i v_i is then a quadrature of a first moment that very nearly vanishes
-        # over a closed surface, so the frame is built from the cancellation residual.
+        # gate be selective at all.
         #
         # No area term, deliberately: area weighting makes that quadrature MORE faithful
-        # and drives the residual further toward zero. The latent wants it, the pose
-        # does not.
+        # and drives the residual further toward zero.
         gate_in = torch.cat([scalars, vectors.norm(dim=-1)], dim=-1)  # [n, #0e + n_vec]
         weights = self._attention_weights(gate_in, tokens.batch,
                                           self.vector_weight_net)     # [n, 1]
@@ -420,7 +412,7 @@ class GroupEncoder(nn.Module):
         # returns orthonormal axes, so Gram-Schmidt is exact there and only the
         # first-moment path benefits from the symmetric alternative.
         rotation = (self._polar_frame(v1, v2) if self.pose_mode == "polar"
-                    else self.get_rotation_matrix_from_two_vectors(v1, v2))
+                    else self._Gram_Schmidt_frame(v1, v2))
         return rotation, transl, aux
 
     @staticmethod
@@ -449,7 +441,7 @@ class GroupEncoder(nn.Module):
         is numerical noise rather than genuine sensitivity. The closed form has no such
         failure: it reduces to the identity map exactly where SVD is worst.
 
-        Columns, matching ``get_rotation_matrix_from_two_vectors``, so the encoder's
+        Columns, matching ``_Gram_Schmidt_frame``, so the encoder's
         LEFT-equivariance convention (R -> QR under x -> Qx) is unchanged and the
         transpose in ``EncoderCodes.get_pose`` still applies -- ``cross(Qv1, Qv2) =
         Q cross(v1, v2)`` for det Q = 1, so every axis carries Q out front.
@@ -530,9 +522,7 @@ class GroupEncoder(nn.Module):
                                           torch.ones_like(skew)))
         return signed[0], signed[1]
 
-
-
-    def get_rotation_matrix_from_two_vectors(self, v1, v2):
+    def _Gram_Schmidt_frame(self, v1, v2):
         """Compute rotation matrix from two vectors using Gram-Schmidt orthogonalization.
 
         IMPORTANT: Encoder must learn non-zero pose vectors. If vectors remain near-zero,

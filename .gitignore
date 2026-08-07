@@ -3,3 +3,4 @@ theory*
 diffeomorphic_registration
 outputs*
 *.ipynb
+docs*

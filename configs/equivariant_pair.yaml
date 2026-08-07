@@ -1,0 +1,61 @@
+# Example configuration using SO(3)-equivariant stationary velocity field
+# Mode: pair (two shapes for point cloud registration)
+
+# Input data
+source:  data/rabbit/T127.obj
+target: data/rabbit/T90.obj
+output_dir: outputs/equivariant_example
+
+# Velocity field: equivariant stationary
+field:
+  kind: equivariant_stationary       # SO(3)-equivariant by construction
+  num_steps: 10                       # Integration steps (Euler discretization)
+  gate_hidden_dim: 64                 # Hidden dim for SelfInteraction gating
+  use_tensor_product_self: false      # Use simple o3.Linear (no tensor products)
+
+  # Equivariant layer stack (comment out for single-layer with hidden_irreps)
+  layers:
+    - in_irreps: "1x1o"
+      target_irreps: "32x0e + 8x1o"
+      sh_lmax: 1
+
+    - in_irreps: "32x0e + 8x1o"
+      target_irreps: "32x0e + 8x1o"
+      sh_lmax: 1
+
+    - in_irreps: "32x0e + 8x1o"
+      target_irreps: "32x0e + 8x1o"
+      sh_lmax: 1
+
+  # For single layer without layers stack, uncomment below:
+  # hidden_irreps: "4x0e + 2x1o"      # Intermediate: 4 scalars + 2 vectors
+
+# Shape code (for now: none, no conditioning)
+code:
+  kind: none
+
+# Loss configuration
+loss:
+  data_name: chamfer                  # Chamfer distance (point cloud metric)
+  direction: forward                  # forward | bidirectional
+  sigma: 0.1                          # Data term weight = 1/(2σ²)
+  kinetic_weight: 0                   # NO regularization — test if field can overfit
+  code_reg_weight: 0.0
+  isometry_weight: 0.0
+  isometry_type: strain
+
+# Training configuration
+train:
+  mode: pair                          # pair | cohort
+  steps: 5000
+  batch: 4
+  lr: 0.0001
+  log_every: 50
+  save_every: 500
+  seed: 42                            # For reproducibility
+  val_every: 0
+  export_shapes: 0
+
+# Augmentation (optional)
+augmentation:
+  kind: none                          # none | so3 | se3

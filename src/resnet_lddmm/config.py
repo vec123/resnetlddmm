@@ -19,6 +19,21 @@ from typing import Optional, List, Any, Dict
 #            absolute centroid) composes correctly. Weaker chamfer signal.
 CENTERING_DOMAINS = {"box": (0.0, 1.0), "origin": (-0.5, 0.5)}
 
+# Floating-point precision for the whole run. Named here, resolved to a torch dtype in
+# the runner, so this module stays importable without torch.
+#
+# Nothing in the pipeline hardcodes precision -- every tensor derives its dtype from
+# the data (``dtype=q0.dtype``, ``dtype=points.dtype``, ...) -- so this one key
+# propagates everywhere by itself.
+#
+#   "float32"  the default, and what every result before this key was produced with.
+#   "float64"  ~2x slower on CPU and considerably worse on GPU. Worth it as a
+#              DIAGNOSTIC: the pose vectors are the residual of a first moment that
+#              nearly cancels (measured ~1% of the per-node norms), and cancellation
+#              is exactly where float32 loses relative precision -- 7 significant
+#              digits in, ~5 left in the quantity actually used.
+DTYPES = ("float32", "float64")
+
 
 @dataclass
 class FieldCfg:
@@ -130,6 +145,7 @@ class ExperimentCfg:
     augmentation: AugmentationCfg = dataclass_field(default_factory=AugmentationCfg)
     train: TrainCfg = dataclass_field(default_factory=TrainCfg)
     centering: str = "box"                  # box | origin — see CENTERING_DOMAINS
+    dtype: str = "float32"                  # float32 | float64 — see DTYPES
     use_encoder_pose: bool = False          # Apply learned encoder pose to flow output (unidirectional only)
     freeze_flow_at_identity: bool = False   # If True, skip flow computation; encoder learns pose only
 
@@ -139,7 +155,7 @@ class ExperimentCfg:
 
         Handles nested config for encoder_config and graph_spec.
         """
-        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "centering", "use_encoder_pose", "freeze_flow_at_identity"}
+        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "centering", "dtype", "use_encoder_pose", "freeze_flow_at_identity"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
@@ -156,6 +172,12 @@ class ExperimentCfg:
                 f"{sorted(CENTERING_DOMAINS)}"
             )
 
+        dtype = d.get("dtype", "float32")
+        if dtype not in DTYPES:
+            raise ValueError(
+                f"unknown dtype {dtype!r}; expected one of {list(DTYPES)}"
+            )
+
         # Handle code config with special parsing for encoder_config and graph_spec
         code_dict = d.get("code", {})
         code_cfg = _parse_code_config(code_dict)
@@ -170,6 +192,7 @@ class ExperimentCfg:
             augmentation=augmentation_cfg,
             train=train_cfg,
             centering=centering,
+            dtype=dtype,
             use_encoder_pose=d.get("use_encoder_pose", False),
             freeze_flow_at_identity=d.get("freeze_flow_at_identity", False),
         )

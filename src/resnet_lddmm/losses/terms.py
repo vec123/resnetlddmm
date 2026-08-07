@@ -75,6 +75,68 @@ def apply_pose(points: Tensor, rotation: Optional[Tensor],
     return points
 
 
+# Relative singular-value gap below which the SVD backward stops being trustworthy.
+_PROCRUSTES_GAP_FLOOR = 1e-3
+_PROCRUSTES_WARN_LIMIT = 5
+_procrustes_warnings = 0
+
+
+def _raise_on_nonfinite_grad(grad: Tensor) -> Tensor:
+    """Backward hook: turn a NaN/Inf gradient into a message that names the cause.
+
+    Without this the non-finite value propagates until the composer's finite-loss guard
+    trips, reporting only "non-finite loss" with no hint that a degenerate Procrustes
+    SVD produced it.
+    """
+    if not torch.isfinite(grad).all():
+        raise FloatingPointError(
+            "non-finite gradient through procrustes_rotation: the SVD backward carries "
+            "1/(s_i - s_j) terms and has blown up. The deformed shape is (near) "
+            "rotationally degenerate, so the optimal rotation is undefined rather than "
+            "merely hard to compute. Lower flow_rotation_penalty_weight, or check "
+            "whether the deformation has collapsed toward a sphere/plane/line."
+        )
+    return grad
+
+
+def _check_procrustes_conditioning(singular_values: Tensor) -> None:
+    """Warn loudly when the SVD backward is about to become ill-conditioned.
+
+    ``torch.linalg.svd``'s gradient contains ``1/(s_i - s_j)`` terms, so it diverges as
+    two singular values approach each other. Geometrically that is the shape becoming
+    rotationally symmetric about an axis (a spheroid), planar, or spherical -- cases
+    where the optimal rotation is genuinely undefined. The FORWARD value stays finite
+    and perfectly plausible throughout, which is exactly why this needs saying out loud
+    rather than being left to surface as a mystery NaN later.
+
+    Args:
+        singular_values: [B, 3] descending singular values of the cross-covariance
+    """
+    global _procrustes_warnings
+    if _procrustes_warnings >= _PROCRUSTES_WARN_LIMIT:
+        return
+
+    scale = singular_values[..., 0].clamp_min(1e-12)
+    gaps = torch.stack([
+        (singular_values[..., 0] - singular_values[..., 1]) / scale,
+        (singular_values[..., 1] - singular_values[..., 2]) / scale,
+    ], dim=-1)                                            # [B, 2] relative gaps
+    worst, index = gaps.min().detach(), gaps.min(dim=-1).values.argmin()
+
+    if worst < _PROCRUSTES_GAP_FLOOR:
+        _procrustes_warnings += 1
+        tail = (" (further warnings suppressed)"
+                if _procrustes_warnings == _PROCRUSTES_WARN_LIMIT else "")
+        print(
+            f"[PROCRUSTES_ILL_CONDITIONED] relative singular-value gap "
+            f"{worst.item():.3e} < {_PROCRUSTES_GAP_FLOOR:.0e}; singular values "
+            f"{[round(v, 6) for v in singular_values[index].tolist()]}. The rotation is "
+            f"near-degenerate, so its gradient is unreliable even though the value looks "
+            f"fine. Check for a deformation collapsing toward a sphere, plane or line."
+            f"{tail}"
+        )
+
+
 def procrustes_rotation(X: Tensor, Y: Tensor) -> Tensor:
     """Optimal rotation R minimising ``||X @ R - Y||`` over SO(3), in closed form.
 
@@ -94,14 +156,18 @@ def procrustes_rotation(X: Tensor, Y: Tensor) -> Tensor:
     Xc = X - X.mean(dim=1, keepdim=True)
     Yc = Y - Y.mean(dim=1, keepdim=True)
     H = Xc.transpose(1, 2) @ Yc                                   # [B, 3, 3]
-    U, _, Vh = torch.linalg.svd(H)
+    U, singular_values, Vh = torch.linalg.svd(H)
+    _check_procrustes_conditioning(singular_values)
     V = Vh.transpose(1, 2)
     # det = -1 would be a reflection, not a rotation; flip the least-significant
     # singular direction to stay inside SO(3).
     det = torch.det(U @ V.transpose(1, 2))
     ones = torch.ones_like(det)
     D = torch.diag_embed(torch.stack([ones, ones, det], dim=-1))
-    return U @ D @ V.transpose(1, 2)
+    rotation = U @ D @ V.transpose(1, 2)
+    if rotation.requires_grad:
+        rotation.register_hook(_raise_on_nonfinite_grad)
+    return rotation
 
 
 class FlowRotationPenalty(nn.Module):

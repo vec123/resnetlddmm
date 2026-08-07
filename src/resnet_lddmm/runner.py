@@ -212,6 +212,11 @@ def build(cfg: ExperimentCfg):
     Returns:
         (stepper, loader, transform) where stepper is PairRegistration or CohortRegistration
     """
+    # BEFORE anything is constructed: nn.Module parameters take the default dtype at
+    # __init__, so setting this later would leave a float32 model reading float64 data.
+    # Process-wide, by PyTorch's design -- there is no per-model equivalent.
+    torch.set_default_dtype(getattr(torch, getattr(cfg, "dtype", "float32")))
+
     seed_everything(cfg.train.seed)
     os.makedirs(cfg.output_dir, exist_ok=True)
 
@@ -561,11 +566,6 @@ def run(cfg: ExperimentCfg, callbacks=None):
 
     stepper, loader, transform = build(cfg)
 
-    # Pass transform to TrajectoryExporter
-    for cb in callbacks:
-        if isinstance(cb, TrajectoryExporter):
-            cb.transform = transform
-
     # Add EncoderGraphLogger if using encoder
     if cfg.code.kind == "encoder":
         graph_log_cadence = getattr(cfg.train, 'save_every', 100)
@@ -588,6 +588,14 @@ def run(cfg: ExperimentCfg, callbacks=None):
     # (re-read the cadence rather than reusing log_every: that name only exists on
     # the branch that builds the default list, not when callbacks were passed in)
     callbacks.append(LossLogger(every_n_steps=getattr(cfg.train, 'log_every', 50)))
+
+    # Hand the frame transform to every exporter that wants one. This runs AFTER all
+    # appends above: PoseShapeExporter is added conditionally further up, and assigning
+    # before that left it with transform=None, silently exporting the normalised frame
+    # under world/ as well.
+    for cb in callbacks:
+        if isinstance(cb, (TrajectoryExporter, PoseShapeExporter)):
+            cb.transform = transform
 
     orchestrator = TrainingOrchestrator(
         stepper=stepper,

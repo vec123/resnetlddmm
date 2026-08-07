@@ -108,7 +108,9 @@ def load_shape(path):
     fields = extract_vtp_point_fields(poly, ["area", "normal"])
 
     # Reshape points to [1, N, 3]
-    points = torch.tensor(points_np, dtype=torch.float32).unsqueeze(0)
+    # The run's precision, not a hardcoded one: everything downstream derives its
+    # dtype from these tensors, so this is where cfg.dtype actually takes effect.
+    points = torch.tensor(points_np, dtype=torch.get_default_dtype()).unsqueeze(0)
 
     # Reshape faces to [F, 3]
     faces = torch.tensor(faces_np, dtype=torch.int64)
@@ -116,12 +118,14 @@ def load_shape(path):
     # Extract weights from "area" field (or None if absent)
     weights = None
     if fields["area"] is not None:
-        weights = torch.tensor(fields["area"], dtype=torch.float32).unsqueeze(0)
+        weights = torch.tensor(fields["area"],
+                               dtype=torch.get_default_dtype()).unsqueeze(0)
 
     # Extract normals (or None if absent)
     normals = None
     if fields["normal"] is not None:
-        normals = torch.tensor(fields["normal"], dtype=torch.float32).unsqueeze(0)
+        normals = torch.tensor(fields["normal"],
+                               dtype=torch.get_default_dtype()).unsqueeze(0)
 
     return Shape(points=points, faces=faces, weights=weights, normals=normals)
 
@@ -164,15 +168,19 @@ def joint_normalize(shapes, domain=(0, 1)):
     domain_scale = domain_max - domain_min
     domain_center = (domain_max + domain_min) / 2
 
-    # Transform: first center at origin, scale by 1/scale, then fit to domain
-    transform = FrameTransform(center=center, scale=scale)
+    # Fold the domain into the transform, so invert() is a TRUE inverse of the
+    # normalisation. Applying the domain shift afterwards instead would leave
+    # transform.invert() short by domain_center * scale -- 0.718 for the rabbit under
+    # the default [0,1] domain, i.e. half the bounding box in every axis, silently
+    # displacing every exported "world" shape.
+    #   (p - c)/s * D + d  ==  (p - c')/s'   with   c' = c - d*s/D,  s' = s/D
+    transform = FrameTransform(center=center - domain_center * scale / domain_scale,
+                               scale=scale / domain_scale)
 
     # Normalize all shapes
     normalized_shapes = []
     for shape in shapes:
         norm_points = transform.apply(shape.points)
-        # Shift from [-0.5, 0.5] to domain
-        norm_points = norm_points * domain_scale + domain_center
 
         normalized_shapes.append(Shape(
             points=norm_points,
@@ -226,51 +234,46 @@ def load_cohort(folder, template):
     return cohort_shapes, template_norm, transform
 
 
-def export_reference_shapes(source, target, transform, out_dir):
-    """Export source and target reference shapes as VTP files.
+def export_reference_shapes(template, sample, transform, out_dir):
+    """Export the template and sample reference clouds as VTP files.
 
-    Saves source.vtp and target.vtp in the output directory for visualization
-    alongside trajectories. Shapes are denormalized to world coordinates.
+    Written alongside the trajectory frames so all three can be loaded together:
+    ``template_points.vtp`` is where the flow starts, ``sample_points.vtp`` is what it
+    is being fitted to.
+
+    The output frame is whatever ``transform`` inverts into -- pass the run's
+    FrameTransform for world coordinates, or an identity transform to stay in the
+    normalised frame. TrajectoryExporter calls this once per space, so the caller,
+    not this function, decides.
 
     Args:
-        source: Shape object with points [1, N, 3]
-        target: Shape object with points [1, M, 3]
-        transform: FrameTransform used for normalization (inverted to denormalize)
-        out_dir: directory to save source.vtp and target.vtp files
+        template: Shape with points [1, N, 3], the canonical reference
+        sample: Shape with points [1, M, 3], the (augmented) target
+        transform: FrameTransform, applied via invert()
+        out_dir: directory to write template_points.vtp and sample_points.vtp into
     """
     os.makedirs(out_dir, exist_ok=True)
 
-    # Denormalize source points
-    source_points_norm = source.points[0, :, :]  # [N, 3]
-    source_points_world = transform.invert(source_points_norm)  # [N, 3]
+    def _prepare(shape, label):
+        """One cloud: to the requested frame, with a loud guard on non-finite values."""
+        points = transform.invert(shape.points[0, :, :])
+        bad = torch.isnan(points) | torch.isinf(points)
+        if bad.any():
+            print(f"[WARNING] {label} points contain NaN/Inf, replacing with zeros")
+            points = torch.where(bad, torch.tensor(0.0, device=points.device), points)
+        return points
 
-    # Validate source points
-    if torch.isnan(source_points_world).any() or torch.isinf(source_points_world).any():
-        print(f"[WARNING] Source points contain NaN/Inf, replacing with zeros")
-        source_points_world = torch.where(torch.isnan(source_points_world) | torch.isinf(source_points_world),
-                                          torch.tensor(0.0, device=source_points_world.device), source_points_world)
+    template_points = _prepare(template, "Template")
+    save_vtp(create_polydata(template_points, faces=None),
+             os.path.join(out_dir, "template_points.vtp"), binary=True)
 
-    # Create and save source PolyData (point cloud, no faces)
-    source_polydata = create_polydata(source_points_world, faces=None)
-    source_path = os.path.join(out_dir, "template_points.vtp")
-    save_vtp(source_polydata, source_path, binary=True)
+    sample_points = _prepare(sample, "Sample")
+    save_vtp(create_polydata(sample_points, faces=None),
+             os.path.join(out_dir, "sample_points.vtp"), binary=True)
 
-    # Denormalize target points
-    target_points_norm = target.points[0, :, :]  # [M, 3]
-    target_points_world = transform.invert(target_points_norm)  # [M, 3]
-
-    # Validate target points
-    if torch.isnan(target_points_world).any() or torch.isinf(target_points_world).any():
-        print(f"[WARNING] Target points contain NaN/Inf, replacing with zeros")
-        target_points_world = torch.where(torch.isnan(target_points_world) | torch.isinf(target_points_world),
-                                          torch.tensor(0.0, device=target_points_world.device), target_points_world)
-
-    # Create and save target PolyData (point cloud, no faces)
-    target_polydata = create_polydata(target_points_world, faces=None)
-    target_path = os.path.join(out_dir, "sample_points.vtp")
-    save_vtp(target_polydata, target_path, binary=True)
-
-    print(f"[io.export_reference_shapes] Exported source ({source_points_world.shape[0]} points) and target ({target_points_world.shape[0]} points)")
+    print(f"[io.export_reference_shapes] Exported template "
+          f"({template_points.shape[0]} points) and sample "
+          f"({sample_points.shape[0]} points)")
 
 
 def export_trajectory(traj, faces, transform, out_dir):
@@ -316,7 +319,7 @@ def export_trajectory(traj, faces, transform, out_dir):
 
         # Add velocity as point field (zero for step 0, actual velocity for steps 1..K)
         if step == 0:
-            velocity = torch.zeros(N, 3, dtype=torch.float32)
+            velocity = torch.zeros(N, 3, dtype=traj.points.dtype)
         else:
             velocity = traj.velocities[step - 1, 0, :, :]  # [N, 3]
 
