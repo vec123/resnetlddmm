@@ -89,6 +89,11 @@ class LossCfg:
     flow_rotation_penalty_kwargs: dict = dataclass_field(default_factory=dict)
     isometry_type: str = "strain"           # or "det" / "orthogonal"
     isometry_samples: int = 64              # points per step for isometry (64 = ~5x speedup)
+    # True keeps the isometry term a pure FIELD regularizer (the trajectory it reads
+    # is detached). Set False with pose_application="pre" so the term can also reach
+    # the pose -- otherwise the trajectory depends on R but the gradient still cannot
+    # get there. Costs backprop through the integration chain.
+    isometry_detach: bool = True
     subsample_M: float = 2000               # subsample source to N points before flow. int (absolute) or 0<x<1 (fraction); 0 = disabled
     save_full: bool = False                 # when subsampling: also compute and export full trajectory
     # Open-ended extra terms, resolved through the "loss_term" Registry category.
@@ -148,6 +153,12 @@ class ExperimentCfg:
     dtype: str = "float32"                  # float32 | float64 — see DTYPES
     use_encoder_pose: bool = False          # Apply learned encoder pose to flow output (unidirectional only)
     freeze_flow_at_identity: bool = False   # If True, skip flow computation; encoder learns pose only
+    # Where the pose enters relative to the flow. "post" (pred = phi(T) @ R) leaves the
+    # trajectory independent of R, so kinetic and isometry are EXACTLY constant in the
+    # pose and only the data term can train it. "pre" (pred = phi(T @ R)) puts the
+    # trajectory downstream of R, which is what makes "the correct pose needs the least
+    # non-rigid flow" trainable. See UnidirectionalMappingError.
+    pose_application: str = "post"          # post | pre
 
     @classmethod
     def from_dict(cls, d: dict) -> "ExperimentCfg":
@@ -155,7 +166,7 @@ class ExperimentCfg:
 
         Handles nested config for encoder_config and graph_spec.
         """
-        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "centering", "dtype", "use_encoder_pose", "freeze_flow_at_identity"}
+        allowed_keys = {"source", "target", "output_dir", "field", "code", "loss", "augmentation", "train", "centering", "dtype", "use_encoder_pose", "freeze_flow_at_identity", "pose_application"}
         unknown = set(d.keys()) - allowed_keys
         if unknown:
             raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
@@ -178,6 +189,12 @@ class ExperimentCfg:
                 f"unknown dtype {dtype!r}; expected one of {list(DTYPES)}"
             )
 
+        pose_application = d.get("pose_application", "post")
+        if pose_application not in ("post", "pre"):
+            raise ValueError(
+                f"unknown pose_application {pose_application!r}; expected 'post' or 'pre'"
+            )
+
         # Handle code config with special parsing for encoder_config and graph_spec
         code_dict = d.get("code", {})
         code_cfg = _parse_code_config(code_dict)
@@ -195,6 +212,7 @@ class ExperimentCfg:
             dtype=dtype,
             use_encoder_pose=d.get("use_encoder_pose", False),
             freeze_flow_at_identity=d.get("freeze_flow_at_identity", False),
+            pose_application=pose_application,
         )
 
 

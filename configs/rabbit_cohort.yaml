@@ -14,7 +14,7 @@
 
 source: data/rabbit/centered_cohort             # 2 shapes: T127, T365 (NOT copies of the template)
 target: data/rabbit/T90_centered.obj            # template the flow starts from
-output_dir: outputs/rabbit_pose_mode_2
+output_dir: outputs/rabbit_iso_loss_pose_pre
 
 centering: origin
 
@@ -82,23 +82,25 @@ code:
     noise_std: 0.0
 
 augmentation:
-  kind: so3                            # random rotation per sample, per step
+  kind: none                            # random rotation per sample, per step
   seed: 42
 
-use_encoder_pose: true                 # apply the predicted pose to the flow output
-freeze_flow_at_identity: true         # keep the flow live (see header note)
+use_encoder_pose: false                 # apply the predicted pose to the flow output
+freeze_flow_at_identity: false         # keep the flow live (see header note)
 
+pose_application: post
 loss:
   data_name: chamfer
   data_kwargs: {}
   direction: forward                   # encoder pose requires unidirectional
   sigma: 0.01                           # data weight = 1/(2*sigma^2) = 50
-  kinetic_weight: 1000
+  kinetic_weight: 0.001
   code_reg_weight: 0.0
   weight_decay: 0.0001
   isometry_weight: 0.0
   isometry_type: orthogonal
-  isometry_samples: 32
+  isometry_detach: false
+  isometry_samples: 16
   subsample_M: 0                       # mesh is 252 verts; anything >=252 is a no-op
 
   # || phi(g.T) - g.phi(T) ||^2. 

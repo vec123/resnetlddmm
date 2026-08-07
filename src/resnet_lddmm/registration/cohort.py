@@ -100,7 +100,9 @@ class CohortRegistration:
 
         # Add isometry loss if enabled
         if self.iso_loss is not None:
-            values["isometry"] = self.iso_loss(fwd_traj, self.flow.field)
+            # The code goes with it: a conditioned field cannot be evaluated
+            # without one, and it must be the code the trajectory was flowed with.
+            values["isometry"] = self.iso_loss(fwd_traj, self.flow.field, code)
 
         # Configured extra terms (loss.terms). Each returns a scalar or None; the
         # composer skips None, so mode-dependent terms need no branch here. Adding

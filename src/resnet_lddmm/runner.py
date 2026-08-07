@@ -245,6 +245,34 @@ def build(cfg: ExperimentCfg):
             "Set loss.direction='forward' or disable use_encoder_pose."
         )
 
+    pose_application = getattr(cfg, 'pose_application', 'post')
+    if pose_application == "pre":
+        if cfg.loss.direction == "bidirectional":
+            raise ValueError(
+                "pose_application='pre' is implemented for unidirectional flow only. "
+                "Set loss.direction='forward'."
+            )
+        if not use_encoder_pose:
+            raise ValueError(
+                "pose_application='pre' requires use_encoder_pose=true; there is no "
+                "pose to apply otherwise."
+            )
+        # The whole point of "pre" is to give the flow-cost terms a path to the pose.
+        # Detaching inside the isometry term cuts that path while leaving the loss
+        # VALUE responsive to the pose -- the failure would look like a weak signal
+        # rather than a severed one, so it is called out here.
+        if cfg.loss.isometry_weight > 0 and cfg.loss.isometry_detach:
+            print(
+                "[POSE-PRE] loss.isometry_detach=true: the isometry term still cannot "
+                "reach the pose. Set loss.isometry_detach=false to couple them "
+                "(kinetic couples either way)."
+            )
+        if freeze_flow_at_identity:
+            print(
+                "[POSE-PRE] freeze_flow_at_identity=true: the flow is the identity, so "
+                "its cost terms are constant and 'pre' changes nothing."
+            )
+
     # Build conditioning (shared across pair/cohort)
     # Orthogonal axes: position_aware (grid interpolation or broadcast?)
     #                  + conditioning_method (concat or FiLM modulation?)
@@ -333,7 +361,8 @@ def build(cfg: ExperimentCfg):
     iso_loss = Registry.create(
         "iso_loss", "isometry",
         loss_type=cfg.loss.isometry_type,
-        sample_points=cfg.loss.isometry_samples
+        sample_points=cfg.loss.isometry_samples,
+        detach_trajectory=cfg.loss.isometry_detach
     ) if cfg.loss.isometry_weight > 0 else None
 
     # Build loss composer (shared). data/kinetic/code_reg/isometry are produced by
@@ -428,7 +457,7 @@ def _build_pair(cfg, flow, data_term, composer, iso_loss, augmentation, use_enco
     if cfg.loss.direction == "bidirectional":
         mapping_error = BidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
     else:  # default to forward
-        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
+        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full, pose_application=cfg.pose_application)
 
     # Create loader with normalized shapes
     class SimpleBatch:
@@ -477,7 +506,7 @@ def _build_cohort(cfg, flow, data_term, composer, iso_loss, augmentation, use_en
     if cfg.loss.direction == "bidirectional":
         mapping_error = BidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
     else:  # default to forward
-        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full)
+        mapping_error = UnidirectionalMappingError(subsample_n=subsample_n if subsample_n > 0 else None, save_full=cfg.loss.save_full, pose_application=cfg.pose_application)
 
     # Create loader for cohort
     loader = CohortBatchLoader(cohort_norm, target_norm, batch_size=cfg.train.batch)

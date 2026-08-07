@@ -101,16 +101,46 @@ class UnidirectionalMappingError:
 
     pose_call_counter = 0  # Counter for pose transformation debugging
 
-    def __init__(self, subsample_n: Optional[int] = None, save_full: bool = False):
+    def __init__(self, subsample_n: Optional[int] = None, save_full: bool = False,
+                 pose_application: str = "post"):
         """Initialize mapping error.
 
         Args:
             subsample_n: if not None, randomly subsample source to this many points before flow.
                         Target shape is kept at full resolution.
             save_full: if True, also compute and store trajectory on full source points
+            pose_application: WHERE the encoder pose enters, relative to the flow.
+
+                "post" (default, the original behaviour)
+                    ``pred = phi(T) @ R``. The flow starts from the canonical
+                    template, so the trajectory does not depend on R at all --
+                    kinetic energy and the isometry penalty are then EXACTLY
+                    constant in R (verified: identical to 6 decimals over a full
+                    360-degree sweep, and autograd reports no path). Only the data
+                    term can move the pose.
+
+                "pre"
+                    ``pred = phi(T @ R)``. The flow starts from the POSED template,
+                    so the trajectory -- and therefore kinetic energy and isometry
+                    -- become functions of R. This is what makes "the correct pose
+                    is the one needing the least non-rigid flow" an objective the
+                    pose can actually be trained on: kinetic charges the rigid part
+                    of any compensation the flow attempts, isometry charges the
+                    non-rigid part.
+
+                    Caveat: the direct coupling relies on the field NOT being
+                    equivariant. For an exactly equivariant field
+                    phi(T @ R) = phi(T) @ R, so at fixed phi the flow cost is
+                    rotation-invariant again and only the (much weaker) envelope
+                    effect survives. Use with the MLP fields.
         """
+        if pose_application not in ("post", "pre"):
+            raise ValueError(
+                f"pose_application must be 'post' or 'pre', got {pose_application!r}"
+            )
         self.subsample_n = subsample_n
         self.save_full = save_full
+        self.pose_application = pose_application
         self.last_full_vertices = None  # Track full vertex count for logging
         self.last_subsample_vertices = None
         self.last_fwd_traj = None  # Store trajectory to avoid recomputation
@@ -153,25 +183,39 @@ class UnidirectionalMappingError:
         if template_points.shape[0] == 1 and code is not None and code.shape[0] > 1:
             template_points = template_points.expand(code.shape[0], -1, -1)
 
-        # Flow on (possibly subsampled) template points
-        fwd = flow(template_points, code)
-        self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
-        self.last_template_points = template_points  # what configured terms must reuse
-        self.last_effective_pose = (None, None)
-        pred = fwd.end
-
-        # Apply encoder pose if provided (transforms pred to augmented frame for comparison)
-        if encoder_pose is not None and (encoder_pose[0] is not None or encoder_pose[1] is not None):
+        rotation, translation = None, None
+        has_pose = encoder_pose is not None and (encoder_pose[0] is not None
+                                                 or encoder_pose[1] is not None)
+        if has_pose:
             rotation, translation = encoder_pose
             # For SO(3)-only training, skip translation (doesn't have requires_grad)
             # to avoid breaking gradient flow. Translation will be enabled for SE(3) later.
+            # NOTE: reading model semantics off an autograd flag is fragile -- whether
+            # the pose is SO(3) or SE(3) is the pose head's to declare, not the loss's
+            # to infer. Left as-is here; changing it is an encoder-side change.
             if translation is not None and not translation.requires_grad:
                 translation = None
 
             if rotation is not None and not rotation.requires_grad:
                 print(f"[GRADIENT_ERROR] rotation.requires_grad=False! This breaks gradient flow to encoder.")
 
-            self.last_effective_pose = (rotation, translation)
+        self.last_effective_pose = (rotation, translation)
+
+        # "pre": the pose moves the template BEFORE the flow, which is what puts the
+        # trajectory -- and so kinetic energy and isometry -- downstream of R.
+        if has_pose and self.pose_application == "pre":
+            template_points = self._apply_encoder_pose(template_points, rotation, translation)
+
+        # Flow on (possibly subsampled) template points
+        fwd = flow(template_points, code)
+        self.last_fwd_traj = fwd  # Store for reuse (avoid double-computation in pair.py)
+        # The points actually flowed, posed or not -- configured terms must reuse
+        # these or their reference frame disagrees with the trajectory's.
+        self.last_template_points = template_points
+        pred = fwd.end
+
+        # "post": the flow output is rotated into the augmented frame for comparison.
+        if has_pose and self.pose_application == "post":
             pred = self._apply_encoder_pose(pred, rotation, translation)
 
         # Optionally compute full trajectory for export if save_full=True
