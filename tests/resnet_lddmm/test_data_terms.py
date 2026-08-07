@@ -464,19 +464,32 @@ class TestWeightedCDDataPerPoint:
         losses = term(pred, target, per_point=True)
         assert losses.shape == (2, 15)
 
-    def test_weighted_cddata_per_point_with_weights(self):
-        """Verify per_point respects tgt_w."""
+    def test_weighted_cddata_per_point_scales_with_weights(self):
+        """Verify per_point scales each target's loss by its tgt_w, exactly.
+
+        Weighs the SAME targets twice instead of comparing two disjoint halves of
+        one random cloud. The halves differ by their own nearest-neighbour
+        distances, which are random and unrelated to the weights, so the previous
+        form failed whenever the lighter half happened to lie further from `pred`
+        -- roughly one run in five. On the per_point path tgt_w is applied raw
+        (the scalar path is the one that normalises), so 2x weights are exactly
+        2x losses and the check needs no tolerance for the geometry.
+        """
+        torch.manual_seed(0)
         term = WeightedCDData()
         pred = torch.randn(1, 5, 3)
         target = torch.randn(1, 10, 3)
-        w = torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0]])
+        uniform = torch.ones(1, 10)
 
-        losses = term(pred, target, tgt_w=w, per_point=True)
+        baseline = term(pred, target, tgt_w=uniform, per_point=True)
+        doubled = term(pred, target, tgt_w=2.0 * uniform, per_point=True)
 
-        # Last 5 targets have 2x weight, so losses should be roughly 2x
-        mean_first_half = losses[:, :5].mean()
-        mean_second_half = losses[:, 5:].mean()
-        assert mean_second_half > mean_first_half
+        assert torch.allclose(doubled, 2.0 * baseline, rtol=1e-6)
+        # ... and a per-point weight lifts only the points it applies to.
+        mixed = torch.cat([torch.ones(1, 5), 2.0 * torch.ones(1, 5)], dim=1)
+        losses = term(pred, target, tgt_w=mixed, per_point=True)
+        assert torch.allclose(losses[:, :5], baseline[:, :5], rtol=1e-6)
+        assert torch.allclose(losses[:, 5:], 2.0 * baseline[:, 5:], rtol=1e-6)
 
 
 class TestPCDDataBasics:

@@ -7,6 +7,7 @@ These tests verify the registration works on known transformations:
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 import pytest
@@ -25,10 +26,12 @@ from src.learning.loader.loaders import OneBatchLoader
 
 @dataclass
 class SimpleBatch:
-    """Simple batch with points and optional weights."""
+    """Stand-in for the pair loader's batch; see test_pair.SimpleBatch."""
 
     points: torch.Tensor
-    weights: torch.Tensor | None = None
+    # See test_pair.SimpleBatch: PEP 604 in a dataclass field breaks on 3.8.
+    weights: Optional[torch.Tensor] = None
+    faces: Optional[torch.Tensor] = None
 
 
 def rotation_matrix_z(angle):

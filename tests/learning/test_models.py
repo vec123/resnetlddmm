@@ -38,7 +38,9 @@ def test_group_encoder_rotation():
 
     v1 = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32)
     v2 = torch.tensor([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]], dtype=torch.float32)
-    rotation_matrix = encoder.get_rotation_matrix_from_two_vectors(v1, v2)
+    # Renamed: the frame builders are _Gram_Schmidt_frame and _polar_frame, chosen
+    # by pose_mode (see GroupEncoder._pose). This is the Gram-Schmidt one.
+    rotation_matrix = encoder._Gram_Schmidt_frame(v1, v2)
 
     print('rotation_matrix shape:', rotation_matrix.shape)
     assert rotation_matrix.shape == (2, 3, 3)

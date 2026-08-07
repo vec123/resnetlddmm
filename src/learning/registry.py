@@ -24,23 +24,69 @@ class Registry:
         cls._entries[(category, name)] = target
 
     @classmethod
-    def create(cls, category: str, name: str, **kwargs):
-        """Resolve, import, instantiate. Unknown name -> ValueError listing valid names."""
+    def resolve(cls, category: str, name: str) -> type:
+        """Import and return the CLASS a registration names. No instantiation.
+
+        Both failure paths are re-raised naming the registration. The bare
+        importlib error reports only that some module or attribute is missing and
+        never which (category, name) pointed at it -- which is the single fact
+        needed to repair the entry, and the reason stringly-typed targets rot
+        quietly in the first place.
+        """
         key = (category, name)
         if key not in cls._entries:
             raise ValueError(
                 f"no {category!r} registered under name {name!r}; "
                 f"available: {cls.available(category)}"
             )
-        module_path, qualname = cls._entries[key].split(":")
-        module = import_module(module_path)
-        target_cls = getattr(module, qualname)
-        return target_cls(**kwargs)
+
+        target = cls._entries[key]
+        module_path, qualname = target.split(":")
+
+        try:
+            module = import_module(module_path)
+        except ModuleNotFoundError as error:
+            # Only when the REGISTERED module is the missing one. A module that
+            # imports an absent third-party dependency (e3nn, torch_geometric)
+            # raises the same class, and calling that a stale registration would
+            # send the reader to the wrong file.
+            if error.name != module_path:
+                raise
+            raise ImportError(
+                f"registration {category}/{name} -> {target!r}: module "
+                f"{module_path!r} does not exist; it was moved or renamed without "
+                f"updating the registration"
+            ) from error
+
+        try:
+            return getattr(module, qualname)
+        except AttributeError as error:
+            raise ImportError(
+                f"registration {category}/{name} -> {target!r}: {module_path!r} has "
+                f"no {qualname!r}; the class was renamed without updating the "
+                f"registration"
+            ) from error
+
+    @classmethod
+    def create(cls, category: str, name: str, **kwargs):
+        """Resolve, import, instantiate. Unknown name -> ValueError listing valid names."""
+        return cls.resolve(category, name)(**kwargs)
 
     @classmethod
     def available(cls, category: str) -> list:
         """Names in a category -- powers --help and error messages."""
         return sorted(name for (cat, name) in cls._entries if cat == category)
+
+    @classmethod
+    def entries(cls) -> dict:
+        """{(category, name): target string} for EVERY registered component.
+
+        A copy, so a caller iterating the registry cannot mutate it by accident.
+        The read-only view that rot guards want: `available` answers per category
+        and would need the category list to be known up front, which is the one
+        thing a "check everything registered" test cannot assume.
+        """
+        return dict(cls._entries)
 
 
 # --------------------------------------------------------------------------- #

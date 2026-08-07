@@ -3,6 +3,7 @@
 import tempfile
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -16,7 +17,8 @@ from src.learning.callbacks.base import TrainingContext
 class SimpleBatch:
     """Simple batch for testing."""
     points: torch.Tensor
-    weights: torch.Tensor | None = None
+    # See test_pair.SimpleBatch: PEP 604 in a dataclass field breaks on 3.8.
+    weights: Optional[torch.Tensor] = None
 
 
 class LegacyStepper:

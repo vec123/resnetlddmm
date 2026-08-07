@@ -108,12 +108,27 @@ class TestTriangleFlips:
 class TestLipschitzBound:
     """Tests for lipschitz_bound."""
 
-    def test_lipschitz_bound_time_varying_field(self):
-        """Compute Lipschitz bound for a small TimeVaryingField."""
+    def test_lipschitz_bound_is_zero_at_init(self):
+        """A freshly built field is the constant-zero map, so its bound is 0.
+
+        Not a degenerate case to work around: the final layer is zero-initialized
+        on purpose (v == 0 at init => the flow starts as the identity), and the
+        bound is a PRODUCT of spectral norms, so one zero factor makes it zero.
+        Which is the right answer -- a constant map has Lipschitz constant 0.
+        """
         field = TimeVaryingField(num_blocks=2, width=8, activation="relu")
+
+        assert lipschitz_bound(field) == 0.0
+
+    def test_lipschitz_bound_positive_once_weights_are_nonzero(self):
+        """Past init, the bound is positive and finite."""
+        field = TimeVaryingField(num_blocks=2, width=8, activation="relu")
+        for module in field.modules():
+            if isinstance(module, torch.nn.Linear):
+                torch.nn.init.normal_(module.weight, std=0.1)
+
         bound = lipschitz_bound(field)
 
-        # Bound should be positive and finite
         assert bound > 0
         assert torch.isfinite(torch.tensor(bound))
 

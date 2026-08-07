@@ -390,26 +390,30 @@ class TestExportTrajectory:
             # All velocities should be zero
             assert np.allclose(velocity, 0.0, atol=1e-6)
 
-    def test_export_preserves_faces(self):
-        """Verify faces are preserved in exported files."""
+    def test_export_writes_point_clouds_not_meshes(self):
+        """Trajectory steps carry no connectivity, even when faces are passed.
+
+        Deliberate, not an oversight: export_trajectory receives the template's
+        faces whether or not the trajectory was subsampled, and under subsampling
+        those indices name vertices that are not the exported points. Every step
+        is a point cloud so the format does not depend on the run's settings.
+        """
         points = torch.randn(2, 1, 4, 3)
         velocities = torch.randn(1, 1, 4, 3)
         traj = Trajectory(points=points, velocities=velocities, dt=0.5)
 
-        # Define faces
+        # Valid connectivity for these 4 points -- passed, and still not written.
         faces = torch.tensor([[0, 1, 2], [1, 2, 3]], dtype=torch.int64)
         transform = FrameTransform(center=torch.zeros(3), scale=torch.tensor(1.0))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             export_trajectory(traj, faces, transform, tmpdir)
 
-            # Load any step and check faces
             poly = load_vtp(os.path.join(tmpdir, "step_0000.vtp"))
-            _, faces_np = extract_vtp_points_cells(poly)
+            points_np, faces_np = extract_vtp_points_cells(poly)
 
-            # Should have 2 faces (triangles)
-            assert faces_np.shape[0] == 2
-            assert faces_np.shape[1] == 3
+            assert points_np.shape == (4, 3)
+            assert faces_np.shape[0] == 0, "trajectory export must not write polygons"
 
     def test_export_multiple_steps(self):
         """Verify export handles multiple trajectory steps."""

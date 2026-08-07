@@ -24,7 +24,7 @@ from src.learning.models.group_encoder import GroupEncoder
 from src.spec import EncoderConfig, EncoderLayerConfig
 
 
-gram_schmidt = GroupEncoder.get_rotation_matrix_from_two_vectors.__get__(object())
+gram_schmidt = GroupEncoder._Gram_Schmidt_frame
 polar = GroupEncoder._polar_frame
 
 

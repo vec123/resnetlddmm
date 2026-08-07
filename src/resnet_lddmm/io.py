@@ -282,12 +282,16 @@ def export_trajectory(traj, faces, transform, out_dir):
     Saves one VTP file per integration step with velocity as a point field.
     Points are denormalized from normalized domain back to world coordinates.
 
-    When subsampling is used, faces are not exported (point cloud only) since face
-    indices would be invalid for subsampled points.
+    Trajectories are written as POINT CLOUDS -- no connectivity, ever. The
+    exporter is handed the template's faces whether or not the trajectory was
+    subsampled, and in the subsampled case those indices address the full mesh,
+    so they would join points that are not the ones they name. Rather than
+    carrying faces sometimes, the format is the same every time.
 
     Args:
         traj: Trajectory object with points [K+1, B, N, 3] and velocities [K, B, N, 3]
-        faces: [F, 3] face indices carried to all steps (ignored if subsampled)
+        faces: accepted for call-site symmetry with the other exporters and
+            deliberately unused; see above
         transform: FrameTransform used for normalization (inverted to denormalize)
         out_dir: directory to save step_XXXX.vtp files
 

@@ -23,7 +23,7 @@ import pytest
 import torch
 
 from src.paths import get_project_root
-from src.learning.helpers import load_dataset, build_training_graph
+from src.learning.data.loading import load_dataset, build_training_graph
 from src.learning.models.group_encoder import GroupEncoder
 from src.learning.models.folding_decoder import FoldingDecoder
 from src.learning.trainers.E3_end2end import TrainingStepper

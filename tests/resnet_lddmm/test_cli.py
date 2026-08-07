@@ -156,34 +156,48 @@ class TestLoadConfig:
             assert cfg.train.lr == 1e-4  # default
 
 
-class TestPoCConfig:
-    """Tests that the PoC config is valid and complete."""
+CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
+SHIPPED_CONFIGS = sorted(CONFIGS_DIR.glob("*.yaml"))
 
-    def test_poc_config_exists_and_loads(self):
-        """Verify PoC config file exists and can be loaded."""
-        poc_path = Path("configs/hand_pair_poc.yaml")
-        assert poc_path.exists(), f"PoC config not found at {poc_path}"
 
-        cfg = load_config(str(poc_path))
+class TestShippedConfigs:
+    """Every config in configs/ parses and carries sane hyperparameters.
+
+    Discovered by glob rather than named one by one. The version of this that
+    named configs/hand_pair_poc.yaml outlived the file -- it was deleted along
+    with the other PoC configs, and the test then failed on a missing path
+    rather than on anything about the code. A glob cannot rot that way: a
+    deleted config simply stops being a case, and a new one is covered for free.
+    """
+
+    def test_configs_directory_is_not_empty(self):
+        """Guard the glob itself -- zero cases would make the suite below vacuous."""
+        assert SHIPPED_CONFIGS, f"no *.yaml found in {CONFIGS_DIR}"
+
+    @pytest.mark.parametrize("config_path", SHIPPED_CONFIGS, ids=lambda p: p.name)
+    def test_shipped_config_loads(self, config_path):
+        """Verify the config parses into an ExperimentCfg."""
+        cfg = load_config(str(config_path))
 
         assert isinstance(cfg, ExperimentCfg)
-        assert cfg.source == "data/hand/template.vtp"
-        assert cfg.target == "data/hand/target_3.vtp"
+        assert cfg.source, "config declares no source"
+        assert cfg.target, "config declares no target"
 
-    def test_poc_config_has_reasonable_defaults(self):
-        """Verify PoC config uses reasonable hyperparameters."""
-        cfg = load_config("configs/hand_pair_poc.yaml")
+    @pytest.mark.parametrize("config_path", SHIPPED_CONFIGS, ids=lambda p: p.name)
+    def test_shipped_config_has_reasonable_hyperparameters(self, config_path):
+        """Verify the config's field / training / loss settings are in range."""
+        cfg = load_config(str(config_path))
 
-        # Check reasonable field setup
+        # Field setup
         assert cfg.field.num_steps > 0
         assert cfg.field.width > 0
         assert cfg.field.activation in ("relu", "elu", "tanh")
 
-        # Check reasonable training setup
+        # Training setup
         assert cfg.train.steps > 0
         assert cfg.train.lr > 0
         assert cfg.loss.sigma > 0
 
-        # Check loss weights
+        # Loss weights
         assert cfg.loss.kinetic_weight >= 0
         assert cfg.loss.code_reg_weight >= 0

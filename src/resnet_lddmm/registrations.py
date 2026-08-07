@@ -24,14 +24,18 @@ Registry.register("field", "stationary", "src.resnet_lddmm.fields.time_varying:S
 # SO(3)-equivariant stationary field using e3nn SelfInteraction
 Registry.register("field", "equivariant_stationary", "src.resnet_lddmm.fields.equivariant:EquivariantStationaryField")
 
-# SO(3)-equivariant field with message passing over template
-Registry.register("field", "equivariant_contextual", "src.resnet_lddmm.fields.equivariant_with_context:EquivariantContextualField")
-
-# Simple equivariant contextual field using MLP aggregation
-Registry.register("field", "equivariant_contextual_simple", "src.resnet_lddmm.fields.equivariant_contextual_simple:EquivariantContextualFieldSimple")
-
-# Equivariant template field: velocity parameterized by template geometry
-Registry.register("field", "equivariant_template", "src.resnet_lddmm.fields.equivariant_template_field:EquivariantTemplateField")
+# NOT registered, because the modules do not exist (they never have -- no commit
+# in this repo's history contains them):
+#
+#   equivariant_contextual         fields.equivariant_with_context:EquivariantContextualField
+#   equivariant_contextual_simple  fields.equivariant_contextual_simple:EquivariantContextualFieldSimple
+#   equivariant_template           fields.equivariant_template_field:EquivariantTemplateField
+#
+# Registering a target that cannot be imported turns `Registry.create` into a
+# ModuleNotFoundError instead of the registry's own "unknown kind, valid names
+# are ..." -- the registry advertised three fields nobody could build. runner.build
+# still has a branch for each; those now fail on the registry's error, which names
+# the kinds that DO exist. Re-add a line here when the module lands.
 
 # STEPS T9: DataTerm + CDData + L2Data + EMDData
 Registry.register("data_term", "chamfer", "src.resnet_lddmm.losses.data_terms:CDData")

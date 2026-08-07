@@ -313,19 +313,32 @@ class TestEncoderCodesImportSkip:
 
 # Mock classes for testing without full dependencies
 class MockGraphBuilder:
-    """Stub graph builder for testing."""
+    """Stub graph builder honoring the real one's OUTPUT contract.
+
+    What matters to everything downstream is ``graph.batch``: one entry per NODE
+    naming the shape that node came from, over a flattened [B*N, 3] position
+    array (see graphs.build_radius_graph). It is not the padding mask -- and
+    storing the mask there, as this stub used to, made ``batch.max() + 1`` equal
+    2 for every input, because EncoderCodes passes an all-True [B, N] mask. A
+    3-shape batch then encoded as 2 shapes.
+    """
 
     def build(self, vertices, mask, rng, areas=None, normals=None):
-        """Return dummy graph and supergraph."""
+        """[B, N, 3] vertices + [B, N] mask -> a flat graph over the kept nodes."""
         import torch_geometric.data as tg_data
 
-        # Create a minimal torch_geometric Data object
-        num_nodes = vertices.shape[0]
+        B, N = vertices.shape[0], vertices.shape[1]
+        positions = vertices.reshape(-1, 3)
+        node_batch = torch.arange(B, device=vertices.device).repeat_interleave(N)
+
+        keep = mask.reshape(-1)
+        positions, node_batch = positions[keep], node_batch[keep]
+
         graph = tg_data.Data(
-            x=torch.ones(num_nodes, 1),
-            pos=vertices.clone(),
+            x=torch.ones(positions.shape[0], 1),
+            pos=positions.clone(),
             edge_index=torch.tensor([[], []], dtype=torch.long),
-            batch=mask.clone(),
+            batch=node_batch,
         )
 
         supergraph = None

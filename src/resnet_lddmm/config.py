@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass, field as dataclass_field, replace as dataclass_replace
 from typing import Optional, List, Any, Dict
 
 
@@ -233,6 +233,7 @@ def _parse_code_config(code_dict: dict) -> CodeCfg:
     encoder_cfg = None
     if code_dict.get("kind") == "encoder":
         from src.spec import EncoderConfig, EncoderLayerConfig
+        declares_latent_dim = "latent_dim" in encoder_cfg_dict
         if encoder_cfg_dict:
             # Parse layer configs
             layers_data = encoder_cfg_dict.pop("layers", [])
@@ -241,6 +242,16 @@ def _parse_code_config(code_dict: dict) -> CodeCfg:
         else:
             # Use default EncoderConfig
             encoder_cfg = EncoderConfig()
+
+        # n_z SEEDS latent_dim when encoder_config did not name one. Without this,
+        # `code: {kind: encoder, n_z: 256}` trains a 5-dim code -- EncoderConfig's
+        # default -- discarding the one dimension the config actually stated, and
+        # saying so only in a printed warning. Via replace() rather than by editing
+        # the dict before construction, because EncoderConfig.layers must stay
+        # non-empty and defaults to a list this function would otherwise have to
+        # rebuild. When BOTH are given the rule below is unchanged: the encoder wins.
+        if not declares_latent_dim and "n_z" in code_dict:
+            encoder_cfg = dataclass_replace(encoder_cfg, latent_dim=code_dict["n_z"])
 
         # Validate n_z matches encoder's latent_dim
         config_n_z = code_dict.get("n_z", 256)

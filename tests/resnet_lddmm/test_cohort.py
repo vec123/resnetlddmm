@@ -13,15 +13,11 @@ from src.resnet_lddmm.codes.auto_decoder import AutoDecoderCodes
 from src.resnet_lddmm.losses.data_terms import CDData
 from src.resnet_lddmm.losses import BidirectionalMappingError
 from src.learning.losses.composer import LossTerm, LossComposer
-
-
-@dataclass
-class CohortBatch:
-    """Batch object with points, weights, and shape_ids."""
-
-    points: torch.Tensor
-    shape_ids: torch.Tensor
-    weights: torch.Tensor = None
+# THE CohortBatch the loader actually yields, not a local copy of it. A copy is
+# what these tests used to carry, and it silently went stale when `faces` was
+# added to the real one -- every train_step here then died on
+# `sample_batch.faces` while the production path was fine.
+from src.learning.loader.loaders import CohortBatch
 
 
 class TestCohortRegistrationBasics:

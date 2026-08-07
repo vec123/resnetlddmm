@@ -1,13 +1,13 @@
 {
-  "num_nodes": 1892,
-  "num_edges": 32036,
+  "num_nodes": 1901,
+  "num_edges": 32696,
   "mu_shape": [6, 5],
   "logvar_shape": [6, 5],
   "pred_shape": [6, 16, 3],
-  "num_trainable_params": 57071,
+  "num_trainable_params": 57079,
   "steps": [
-    {"loss": 0.743558, "recon": 0.581930, "kl": 1.616278, "contrastive": 0.0},
-    {"loss": 0.556992, "recon": 0.399209, "kl": 1.577831, "contrastive": 0.0},
-    {"loss": 0.450099, "recon": 0.296067, "kl": 1.540324, "contrastive": 0.0}
+    {"loss": 0.719333, "recon": 0.556056, "kl": 1.632767, "contrastive": 0.0},
+    {"loss": 0.539689, "recon": 0.380332, "kl": 1.593571, "contrastive": 0.0},
+    {"loss": 0.490206, "recon": 0.334678, "kl": 1.555279, "contrastive": 0.0}
   ]
 }

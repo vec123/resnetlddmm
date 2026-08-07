@@ -522,8 +522,13 @@ class GroupEncoder(nn.Module):
                                           torch.ones_like(skew)))
         return signed[0], signed[1]
 
-    def _Gram_Schmidt_frame(self, v1, v2):
+    @staticmethod
+    def _Gram_Schmidt_frame(v1, v2):
         """Compute rotation matrix from two vectors using Gram-Schmidt orthogonalization.
+
+        Static, like ``_polar_frame``: the two are alternatives selected by
+        ``pose_mode`` and neither reads any state off the encoder. The internal
+        ``self._Gram_Schmidt_frame(...)`` call sites are unaffected.
 
         IMPORTANT: Encoder must learn non-zero pose vectors. If vectors remain near-zero,
         this will raise an error to alert the user to fix the encoder initialization.

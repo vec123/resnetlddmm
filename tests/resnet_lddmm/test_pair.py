@@ -1,6 +1,7 @@
 """Tests for PairRegistration stepper."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 import pytest
@@ -17,10 +18,20 @@ from src.learning.losses.composer import LossTerm, LossComposer
 
 @dataclass
 class SimpleBatch:
-    """Simple batch object with points and optional weights."""
+    """Stand-in for the batch the pair loader yields (runner._build_pair).
+
+    Must carry every field the stepper reads off a sample -- `faces` included,
+    even when None: PairRegistration._values rebuilds the augmented sample as a
+    Shape and reads `sample.faces` directly, so a batch missing the attribute is
+    an AttributeError rather than a face-less shape.
+    """
 
     points: torch.Tensor
-    weights: torch.Tensor | None = None
+    # Optional[...] rather than `torch.Tensor | None`: a dataclass evaluates its
+    # annotations at class-creation time, so PEP 604 here is an import-time
+    # TypeError on the 3.8 interpreter this project runs under.
+    weights: Optional[torch.Tensor] = None
+    faces: Optional[torch.Tensor] = None
 
 
 class TestPairRegistrationBasics:
